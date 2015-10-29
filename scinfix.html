@@ -5,7 +5,7 @@
 <title>SCInfix</title>
 <!--
     scinfix.html
-    2015-10-29 v1.00
+    2015-10-30 v1.01
 -->
 <style type="text/css">
 <!--
@@ -357,7 +357,7 @@ var SCInfix;
     function c_sexpr(tok_start, tok_end, quote_flag, priority) {
         var i;
         var tok;
-        var op_obj;
+        var op_obj = {};
         var param_count;
         var code_pos1;
 
@@ -413,7 +413,6 @@ var SCInfix;
             i++;
             // ***** トークン取り出し *****
             tok = token[i];
-
             // ***** 閉じ括弧のとき *****
             // (空の配列 [ ] に変換する)
             if (tok.kind == 2) {
@@ -435,8 +434,6 @@ var SCInfix;
                 if (op_obj.param_num == 1) {
                     code_push(op_obj.operator, debugpos1, i);
                 }
-                // ***** トークン取り出し *****
-                tok = token[i];
                 // ***** トークン解析のループ *****
                 param_count = 0;
                 while (i < tok_end) {
@@ -499,8 +496,6 @@ var SCInfix;
             // (配列へのアクセス a[x][y] ... に変換する)
             if (tok.word == "~") {
                 i++;
-                // ***** トークン取り出し *****
-                tok = token[i];
                 // ***** トークン解析のループ *****
                 param_count = 0;
                 while (i < tok_end) {
