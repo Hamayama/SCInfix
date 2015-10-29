@@ -1,0 +1,967 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>SCInfix</title>
+<!--
+    scinfix.html
+    2015-10-29 v1.00
+-->
+<style type="text/css">
+<!--
+.main_container {
+    background-color: #fffca8; /* 背景色 */
+    color: #000000;            /* 文字色 */
+}
+-->
+</style>
+<script type="text/javascript">
+<!--
+// ****************************************
+//            ブラウザ関連処理等
+// ****************************************
+
+// ***** 汎用 *****
+function Alm(msg) {
+    // alert(msg);
+}
+function Alm2(msg) {
+    alert(msg);
+}
+function DebugShow(msg) {
+    document.getElementById("debug_show1").appendChild(document.createTextNode(msg));
+}
+function DebugShowClear() {
+    document.getElementById("debug_show1").innerHTML = "";
+}
+
+// ***** 変換ボタン *****
+function convert_button() {
+    var ret;
+    var src_st;
+    var curly_conv;
+    var result = {};
+
+    // ***** 戻り値の初期化 *****
+    ret = false;
+    // ***** デバッグ表示の初期化 *****
+    DebugShowClear();
+    // ***** 要素の存在チェック *****
+    if (!document.getElementById("src_text1"))    { Alm("convert_button:0001"); return ret; }
+    if (!document.getElementById("curly_conv"))   { Alm("convert_button:0002"); return ret; }
+    if (!document.getElementById("out_text1"))    { Alm("convert_button:0003"); return ret; }
+    if (!document.getElementById("result_show1")) { Alm("convert_button:0004"); return ret; }
+    // ***** ソースの取得 *****
+    src_st = document.getElementById("src_text1").value;
+    curly_conv = document.getElementById("curly_conv").checked;
+    // ***** 変換実行 *****
+    result = SCInfix.convert(src_st, curly_conv);
+    // ***** 出力の表示 *****
+    document.getElementById("out_text1").value = result.out;
+    document.getElementById("result_show1").innerHTML = result.html;
+    // ***** 戻り値を返す *****
+    ret = true;
+    return ret;
+}
+
+// ***** クリアボタン *****
+function clear_button() {
+    var ret;
+
+    // ***** 戻り値の初期化 *****
+    ret = false;
+    // ***** デバッグ表示の初期化 *****
+    DebugShowClear();
+    // ***** 要素の存在チェック *****
+    if (!document.getElementById("src_text1"))    { Alm("clear_button:0001"); return ret; }
+    if (!document.getElementById("out_text1"))    { Alm("clear_button:0002"); return ret; }
+    if (!document.getElementById("result_show1")) { Alm("clear_button:0003"); return ret; }
+    // ***** ソースのクリア *****
+    document.getElementById("src_text1").value = "";
+    // ***** 出力のクリア *****
+    document.getElementById("out_text1").value = "";
+    document.getElementById("result_show1").innerHTML = "";
+    // ***** 戻り値を返す *****
+    ret = true;
+    return ret;
+}
+
+// ***** サンプルボタン *****
+function sample_button(sample_no) {
+    var ret;
+    var src_st;
+
+    // ***** 戻り値の初期化 *****
+    ret = false;
+    // ***** 要素の存在チェック *****
+    if (!document.getElementById("src_text1"))    { Alm("sample_button:0001"); return ret; }
+    // ***** ソースの設定 *****
+    switch (sample_no) {
+        case 0:
+            src_st = "(+ (* 1 2) (* 3 4) (* 5 6))\n";
+            break;
+        case 1:
+            src_st = ";; Function sample\n"
+                + "(define pi 3.141592653589793)\n"
+                + "(define x (/. pi 6))\n"
+                + "(define y (+ (* (sin x) (sin x)) (* (cos x) (cos x))))\n";
+            break;
+        case 2:
+            src_st = ";; Array sample\n"
+                + "(define a '((1 2 3) (4 5 6) (7 8 9)))\n"
+                + "(print (~ a 0 0))\n"
+                + "(print (~ a 0 1))\n"
+                + "(print (~ a 0 2))\n"
+                + "(print (~ a 2 2))\n";
+            break;
+        default:
+            src_st = "";
+            break;
+    }
+    document.getElementById("src_text1").value = src_st;
+    // ***** 変換ボタンを押したことにする *****
+    convert_button();
+    // ***** 戻り値を返す *****
+    ret = true;
+    return ret;
+}
+
+
+// ****************************************
+//          前置記法→中置記法変換
+// ****************************************
+
+// ***** SCInfix(名前空間) *****
+//
+// 公開I/F :
+//
+//   SCInfix.convert(src_st, curly_conv)  変換実行
+//     src_st      ソース(文字列)
+//     curly_conv  波括弧変換フラグ(boolean)
+//     戻り値      結果オブジェクト
+//                   result.out   テキスト出力(文字列)
+//                   result.html  HTML出力(文字列)
+//
+var SCInfix;
+(function (SCInfix) {
+    // ***** 定数 *****
+    var operator_data = [ // 演算子データ
+        // 手続き名、演算子、引数の数、優先順位
+        ["inc!",     "++",     1,     100], // 引数2個には未対応
+        ["dec!",     "--",     1,     100], // 引数2個には未対応
+        ["expt",     "**",     2,      90],
+        ["not",      "!",      1,      80],
+        ["lognot",   "~",      1,      80],
+        ["*",        "*",      -1,     40],
+        ["/",        "/",      -1,     40],
+        ["*.",       "*",      -1,     40],
+        ["/.",       "/",      -1,     40],
+        ["quotient", "\\",     2,      40],
+        ["modulo",   "%",      2,      40],
+        ["+",        "+",      -1,     30],
+        ["-",        "-",      -1,     30],
+        ["+.",       "+",      -1,     30],
+        ["-.",       "-",      -1,     30],
+        ["string-append", "%%", -1,    30],
+        // ["ash",      "<<",     2,      25], // 負の引数が判定できない
+        ["shl",      "<<",     2,      25], // Schemeには存在しない
+        ["shr",      ">>>",    2,      25], // Schemeには存在しない
+        ["sal",      "<<",     2,      25], // Schemeには存在しない
+        ["sar",      ">>",     2,      25], // Schemeには存在しない
+        ["<",        "<",      -1,     20],
+        ["<=",       "<=",     -1,     20],
+        [">",        ">",      -1,     20],
+        [">=",       ">=",     -1,     20],
+        ["=",        "==",     -1,     20],
+        ["eq?",      "==",     2,      20],
+        ["eqv?",     "==",     2,      20],
+        ["equal?",   "==",     2,      20],
+        ["!=",       "!=",     -1,     20], // Schemeには存在しない
+        ["logand",   "&",      -1,     15],
+        ["logior",   "|",      -1,     15],
+        ["logxor",   "^",      -1,     15],
+        ["and",      "&&",     -1,     10],
+        ["or",       "||",     -1,     10],
+        ["if",       "?",      3,      10], // 引数が2個の場合もある
+        ["set!",     "=",      2,       5],
+        ["define",   "=",      2,       5]];
+
+    // ***** 変数 *****
+    var src_st;              // ソース(文字列)
+    var curly_conv;          // 波括弧変換フラグ(boolean)
+    var out_st;              // テキスト出力(文字列)
+    var html_st;             // HTML出力(文字列)
+    var operator_table = {}; // 演算子情報(連想配列オブジェクト)
+                             //   operator_table[funcname].operator   演算子
+                             //   operator_table[funcname].param_num  引数の数(負の数は特殊)
+                             //   operator_table[funcname].priority   優先順位(大きいほど優先)
+    var token = [];          // トークン(配列)
+                             //   token[i].kind     種別(=0:改行(未使用),
+                             //                          =1:開き括弧,
+                             //                          =2:閉じ括弧,
+                             //                          =3:クォート等の要素の前につく記号,
+                             //                          =51:1行コメント(未使用),
+                             //                          =52:複数行コメント(未使用),
+                             //                          =53:S式コメント(未使用),
+                             //                          =100:その他)
+                             //   token[i].word     単語(文字列)
+                             //   token[i].line_no  行番号(1オリジン)
+    var code = [];           // コード(配列)
+                             //   code[i].word      単語(文字列)
+                             //   code[i].pos1      デバッグ位置1
+                             //   code[i].pos2      デバッグ位置2
+                             //   code[i].opt       最適化用情報(未使用)
+    var debugpos1;           // デバッグ位置1
+    var debugpos2;           // デバッグ位置2
+
+    // ***** 公開I/F *****
+
+    // ***** 変換実行 *****
+    function convert(src_st1, curly_conv1) {
+        var result = {}; // 戻り値
+
+        // ***** 戻り値の初期化 *****
+        result = {};
+        result.out = "";
+        result.html = "";
+        // ***** 引数のチェック *****
+        if (src_st1 == null)     { Alm("SCInfix.convert:0001"); return result; }
+        if (curly_conv1 == null) { Alm("SCInfix.convert:0002"); return result; }
+        // ***** ソースの取得 *****
+        src_st = src_st1;
+        // ***** 波括弧変換フラグの取得 *****
+        curly_conv = curly_conv1;
+        // ***** 演算子情報の生成 *****
+        make_optable();
+        // ***** トークン分割 *****
+        tokenize();
+        // ***** コンパイル *****
+        compile();
+        // ***** 出力の生成 *****
+        make_output();
+        // ***** 戻り値を返す *****
+        result.out = out_st;
+        result.html = html_st;
+        return result;
+    }
+    SCInfix.convert = convert;
+
+    // ***** 公開I/Fはここまで *****
+
+    // ***** 以下は内部処理用 *****
+
+    // ***** 出力の生成 *****
+    function make_output() {
+        var i;
+        var code_length; // コード数
+        var arr_st = []; // 文字列の配列
+
+        // ***** テキスト出力の生成 *****
+        out_st = "";
+        arr_st = [];
+        code_length = code.length;
+        for (i = 0; i < code_length; i++) {
+            // ***** 単語を追加 *****
+            if (code[i].word.length >= 2 &&
+                (code[i].word.charAt(0) == "+" || code[i].word.charAt(0) == "-")) {
+                arr_st.push(" ");
+            }
+            arr_st.push(code[i].word);
+        }
+        out_st = arr_st.join("");
+
+        // ***** HTML出力の生成 *****
+        html_st = "";
+        arr_st = [];
+        code_length = code.length;
+        for (i = 0; i < code_length; i++) {
+            // ***** 単語をサニタイズ(タグ無効化)してから追加 *****
+            if (code[i].word.length >= 2 &&
+                (code[i].word.charAt(0) == "+" || code[i].word.charAt(0) == "-")) {
+                arr_st.push(" ");
+            }
+            arr_st.push(escape_html(code[i].word));
+        }
+        html_st = arr_st.join("");
+
+        // ***** デバッグ表示 *****
+        if (0) {
+            DebugShow("token:\n");
+            for (i = 0; i < token.length; i++) {
+                DebugShow(JSON.stringify(token[i]) + "\n");
+            }
+            DebugShow("code:\n");
+            for (i = 0; i < code.length; i++) {
+                DebugShow(JSON.stringify(code[i]) + "\n");
+            }
+        }
+    }
+
+    // ***** コンパイル *****
+    function compile() {
+        var i;
+        var msg;
+
+        // ***** コンパイル *****
+        code = [];
+        debugpos1 = 0;
+        debugpos2 = 0;
+        try {
+            // ***** プログラムのコンパイル *****
+            c_prog(0, token.length - 4); // 終端4個分マイナス
+            for (i = 0; i < code.length; i++) {
+                // ***** 生成コードに終端がまざっていたとき *****
+                if (code[i].word == ";end") {
+                    debugpos2 = token.length - 4; // 終端4個分マイナス
+                    throw new Error("文が未完成です。");
+                }
+            }
+        } catch (ex) {
+            // ***** 構文エラーのとき *****
+            DebugShow("構文エラー: " + ex.message + ": debugpos=" + debugpos1 + "\n");
+            msg = "エラー場所: " + token[debugpos1].line_no + "行: ";
+            if (debugpos2 <= debugpos1) { debugpos2 = debugpos1 + 1; }
+            for (i = debugpos1; i < debugpos2; i++) {
+                if (i >= 0 && i < token.length - 4) { // 終端4個分マイナス
+                    msg = msg + token[i].word + " ";
+                }
+            }
+            DebugShow(msg + "\n");
+        }
+        // ***** 後処理 *****
+        for (i = 0; i < code.length; i++) {
+            // (終端処理 : エラー表示用)
+            if (code[i].word == ";end") {
+                code[i].word = "";
+                continue;
+            }
+            // (波括弧処理 : 開き波括弧を外す)
+            if (code[i].word.charAt(0) == "{" && curly_conv) {
+                code[i].word = code[i].word.substring(1);
+                continue;
+            }
+        }
+    }
+    // ***** プログラムのコンパイル *****
+    function c_prog(tok_start, tok_end) {
+        var i;
+        // ***** トークン解析のループ *****
+        i = tok_start;
+        while (i < tok_end) {
+            i = c_sexpr(i, tok_end, false, 0);
+            code_push(";", debugpos1, i);
+            code_push("\n", debugpos1, i);
+        }
+    }
+    // ***** S式のコンパイル *****
+    function c_sexpr(tok_start, tok_end, quote_flag, priority) {
+        var i;
+        var tok;
+        var op_obj;
+        var param_count;
+        var code_pos1;
+
+        // ***** トークン取り出し *****
+        i = tok_start;
+        debugpos1 = i;
+        tok = token[i];
+
+        // ***** 終端のとき *****
+        if (tok.word == ";end") {
+            i++;
+            return i;
+        }
+
+        // ***** クォート等のとき *****
+        if (tok.kind == 3) {
+            i++;
+            i = c_sexpr(i, tok_end, true, 0);
+            return i;
+        }
+
+        // ***** 開き括弧かつクォートありのとき *****
+        // (配列 [a,b,c, ... ] に変換する)
+        if (tok.kind == 1 && quote_flag) {
+            i++;
+            code_push("[", debugpos1, i);
+            // ***** トークン解析のループ *****
+            param_count = 0;
+            while (i < tok_end) {
+                // ***** トークン取り出し *****
+                tok = token[i];
+                // ***** 閉じ括弧のとき *****
+                if (tok.kind == 2) { i++; break; }
+                // ***** S式のコンパイル *****
+                param_count++;
+                if (param_count > 1) { code_push(",", debugpos1, i); }
+                i = c_sexpr(i, tok_end, quote_flag, 0);
+            }
+            // ***** 閉じ括弧がなかったとき *****
+            if (tok.kind != 2) {
+                debugpos1 = tok_start;
+                debugpos2 = i;
+                throw new Error("閉じ括弧がありません。");
+            }
+            code_push("]", debugpos1, i);
+            return i;
+        }
+
+        // ***** 開き括弧のとき *****
+        // (空のときは、空の配列 [ ] に変換する)
+        // (空でないときは、手続きとして変換する)
+        if (tok.kind == 1) {
+            i++;
+            // ***** トークン取り出し *****
+            tok = token[i];
+
+            // ***** 閉じ括弧のとき *****
+            // (空の配列 [ ] に変換する)
+            if (tok.kind == 2) {
+                i++;
+                code_push("[", debugpos1, i);
+                code_push("]", debugpos1, i);
+                return i;
+            }
+
+            // ***** 演算子に対応する手続きのとき *****
+            // (式 x=a+b 等 に変換する)
+            op_obj = operator_table.hasOwnProperty(tok.word) ? operator_table[tok.word] : null;
+            if (op_obj) {
+                i++;
+                if (op_obj.priority <= priority) {
+                    code_push("(", debugpos1, i);
+                }
+                code_pos1 = code.length;
+                if (op_obj.param_num == 1) {
+                    code_push(op_obj.operator, debugpos1, i);
+                }
+                // ***** トークン取り出し *****
+                tok = token[i];
+                // ***** トークン解析のループ *****
+                param_count = 0;
+                while (i < tok_end) {
+                    // ***** トークン取り出し *****
+                    tok = token[i];
+                    // ***** 閉じ括弧のとき *****
+                    if (tok.kind == 2) { i++; break; }
+                    // ***** S式のコンパイル *****
+                    param_count++;
+                    if (param_count > 1) {
+                        if (param_count == 3 && op_obj.operator == "?") {
+                            code_push(":", debugpos1, i);
+                        } else {
+                            code_push(op_obj.operator, debugpos1, i);
+                        }
+                    }
+                    i = c_sexpr(i, tok_end, quote_flag, op_obj.priority);
+                    if (param_count > op_obj.param_num && op_obj.param_num != -1) { break; }
+                }
+                // ***** 引数の数をチェック *****
+                if (param_count == 1 && op_obj.operator == "-") {
+                    code_insert(code_pos1, op_obj.operator, debugpos1, i);
+                }
+                if (param_count == 1 && op_obj.operator == "/") {
+                    code_insert(code_pos1, "1", debugpos1, i);
+                    code_insert(code_pos1 + 1, op_obj.operator, debugpos1, i);
+                }
+                if (param_count == 2 && op_obj.operator == "?") {
+                    param_count = 3;
+                    code_push(":", debugpos1, i);
+                    code_push("0", debugpos1, i);
+                }
+                if (param_count == 0) {
+                    debugpos1 = tok_start;
+                    debugpos2 = i;
+                    throw new Error("引数がありません。");
+                }
+                if (param_count != op_obj.param_num && op_obj.param_num != -1) {
+                    debugpos1 = tok_start;
+                    debugpos2 = i;
+                    if (op_obj.operator == "?") {
+                        throw new Error("引数の数が不正です (引数が2個か3個である必要があります)。");
+                    } else {
+                        throw new Error("引数の数が不正です (引数が" + op_obj.param_num + "個である必要があります)。");
+                    }
+                }
+                // ***** 閉じ括弧がなかったとき *****
+                if (tok.kind != 2) {
+                    debugpos1 = tok_start;
+                    debugpos2 = i;
+                    throw new Error("閉じ括弧がありません。");
+                }
+                if (op_obj.priority <= priority) {
+                    code_push(")", debugpos1, i);
+                }
+                return i;
+            }
+
+            // ***** 万能アクセサのとき *****
+            // (配列へのアクセス a[x][y] ... に変換する)
+            if (tok.word == "~") {
+                i++;
+                // ***** トークン取り出し *****
+                tok = token[i];
+                // ***** トークン解析のループ *****
+                param_count = 0;
+                while (i < tok_end) {
+                    // ***** トークン取り出し *****
+                    tok = token[i];
+                    // ***** 閉じ括弧のとき *****
+                    if (tok.kind == 2) { i++; break; }
+                    // ***** S式のコンパイル *****
+                    param_count++;
+                    if (param_count > 1) {
+                        code_push("[", debugpos1, i);
+                    }
+                    i = c_sexpr(i, tok_end, quote_flag, 0);
+                    if (param_count > 1) {
+                        code_push("]", debugpos1, i);
+                    }
+                }
+                // ***** 引数の数をチェック *****
+                if (param_count <= 1) {
+                    debugpos1 = tok_start;
+                    debugpos2 = i;
+                    throw new Error("引数が足りません。");
+                }
+                // ***** 閉じ括弧がなかったとき *****
+                if (tok.kind != 2) {
+                    debugpos1 = tok_start;
+                    debugpos2 = i;
+                    throw new Error("閉じ括弧がありません。");
+                }
+                return i;
+            }
+
+            // ***** その他の手続きのとき *****
+            // (関数呼び出し func(x,y,z, ... ) に変換する)
+            // ***** S式のコンパイル *****
+            i = c_sexpr(i, tok_end, quote_flag, 0);
+            code_push("(", debugpos1, i);
+            // ***** トークン解析のループ *****
+            param_count = 0;
+            while (i < tok_end) {
+                // ***** トークン取り出し *****
+                tok = token[i];
+                // ***** 閉じ括弧のとき *****
+                if (tok.kind == 2) { i++; break; }
+                // ***** S式のコンパイル *****
+                param_count++;
+                if (param_count > 1) { code_push(",", debugpos1, i); }
+                i = c_sexpr(i, tok_end, quote_flag, 0);
+            }
+            // ***** 閉じ括弧がなかったとき *****
+            if (tok.kind != 2) {
+                debugpos1 = tok_start;
+                debugpos2 = i;
+                throw new Error("閉じ括弧がありません。");
+            }
+            code_push(")", debugpos1, i);
+            return i;
+        }
+
+        // ***** その他の要素のとき *****
+        // (そのまま出力する)
+        i++;
+        code_push(tok.word, debugpos1, i);
+        return i;
+    }
+
+    // ***** トークン分割 *****
+    function tokenize() {
+        var i, j;
+        var i_start;      // 単語の開始位置
+        var src_st_len;   // ソースの長さ
+        var ch, ch2;      // 文字
+        var line_no;      // 行番号(1オリジン)
+        var line_no_tk;   // トークン開始時点の行番号
+        var uvector_mode; // ユニフォームベクタ解析モード
+        var comment_nest; // 複数行コメントのネスト数
+        var delim_ch;     // デリミタ文字
+        var string_start; // 文字列開始フラグ(boolean)
+        var temp_st;      // 作業用文字列
+
+        // ***** トークン追加 *****
+        function token_push(kind, word) {
+            var tk = {};
+            // ***** トークン追加 *****
+            tk.kind = kind;
+            if (word == null) {
+                tk.word = src_st.substring(i_start, i);
+            } else {
+                tk.word = word;
+            }
+            tk.line_no = line_no_tk;
+            token.push(tk);
+        }
+
+        // ***** トークン分割 *****
+        token = [];
+        i = 0;
+        line_no = 1;
+        src_st_len = src_st.length;
+        while (i < src_st_len) {
+            // ***** 1文字取り出す *****
+            i_start = i;
+            line_no_tk = line_no;
+            ch = src_st.charAt(i++);
+            if (i < src_st_len) { ch2 = src_st.charAt(i); } else { ch2 = ""; }
+            // ***** 空白またはタブのとき *****
+            if (ch == " " || ch == "\t") { continue; }
+            // ***** 改行のとき *****
+            if (ch == "\r" || ch == "\n") {
+                line_no++;
+                if (ch == "\r" && ch2 == "\n") { i++; }
+                // token_push(0);
+                continue;
+            }
+            // ***** 波括弧「{ ～ }」のとき *****
+            if (ch == "{" && curly_conv) {
+                while (i < src_st_len) {
+                    // ***** 1文字取り出す *****
+                    ch = src_st.charAt(i++);
+                    if (i < src_st_len) { ch2 = src_st.charAt(i); } else { ch2 = ""; }
+                    // ***** エスケープのとき *****
+                    if (ch == "\\" && (ch2 == "\\" || ch2 == "{" || ch2 == "}")) { i++; continue; }
+                    // ***** デリミタのとき *****
+                    if (ch == "}") { break; }
+                    // ***** 改行のとき *****
+                    if (ch == "\r" || ch == "\n") { line_no++; if (ch == "\r" && ch2 == "\n") { i++; } }
+                }
+                // ***** 閉じ波括弧を外して登録 *****
+                if (ch == "}") { j = i - 1; } else { j = i; }
+                if (i_start + 1 < j) { // 波括弧内が0文字なら登録しない
+                    temp_st = src_st.substring(i_start, j)
+                        .replace(/\\\{/g, "{")   // 「{」のエスケープ
+                        .replace(/\\\}/g, "}")   // 「}」のエスケープ
+                        .replace(/\\\\/g, "\\"); // 「\」のエスケープ ← これは最後にしないといけない
+                    token_push(100, temp_st);
+                }
+                continue;
+            }
+            // ***** 開き括弧のとき *****
+            if (ch == "(" || ch == "[" || ch == "{") {
+                token_push(1);
+                continue;
+            }
+            // ***** 閉じ括弧のとき *****
+            if (ch == ")" || ch == "]" || ch == "}") {
+                token_push(2);
+                continue;
+            }
+            // ***** ベクタの開き括弧のとき *****
+            if (ch == "#" && ch2 == "(") {
+                // i++;
+                // token_push(1);
+                token_push(3);
+                continue;
+            }
+            // ***** ユニフォームベクタの開き括弧のとき *****
+            if (ch == "#" && (
+                ch2 == "f" || ch2 == "s" || ch2 == "u" ||
+                ch2 == "F" || ch2 == "S" || ch2 == "U")) {
+                i++;
+                uvector_mode = 0;
+                while (i < src_st_len) {
+                    // ***** 1文字取り出す *****
+                    ch = src_st.charAt(i);
+                    // ***** 数値のとき *****
+                    if (isDigit(ch)) {
+                        i++;
+                        uvector_mode = 1;
+                        if (i >= i_start + 5) { break; }
+                        continue;
+                    }
+                    // ***** 開き括弧のとき *****
+                    if (ch == "(" && uvector_mode == 1) {
+                        // i++;
+                        uvector_mode = 2;
+                        break;
+                    }
+                    // ***** その他のとき *****
+                    break;
+                }
+                // ***** 完成したとき *****
+                if (uvector_mode == 2) {
+                    // token_push(1);
+                    token_push(3);
+                    continue;
+                }
+                // ***** その他のとき(#fや#falseかもしれない) *****
+                ch = "";
+                ch2 = "";
+                // (そのまま下におりてデリミタまでを登録)
+            }
+            // // ***** クォートの開き括弧のとき *****
+            // if (ch == "'" && (ch2 == "(" || ch2 == "[" || ch2 == "{")) {
+            //     i++;
+            //     token_push(1);
+            //     continue;
+            // }
+            // ***** クォート等のとき *****
+            if (ch == "'" || ch == "`" || ch == ",") {
+                if (ch == "," && ch2 == "@") { i++; }
+                token_push(3);
+                continue;
+            }
+            // ***** アンインターンドシンボルまたはリーダ構築子構文のとき *****
+            if (ch == "#" && (ch2 == ":" || ch2 == ",")) {
+                i++;
+                token_push(3);
+                continue;
+            }
+            // ***** デバッグマクロのとき *****
+            if (ch == "#" && ch2 == "?") {
+                i++;
+                if (i < src_st_len && src_st.charAt(i) == "=") {
+                    i++;
+                    token_push(3);
+                    continue;
+                }
+                // ***** その他のとき *****
+                ch = "";
+                ch2 = "";
+                // (そのまま下におりてデリミタまでを登録)
+            }
+            // ***** 1行コメントのとき *****
+            if (ch == ";" || (ch == "#" && ch2 == "!")) {
+                if (ch == "#" && ch2 == "!") { i++; }
+                while (i < src_st_len) {
+                    // ***** 1文字取り出す *****
+                    ch = src_st.charAt(i);
+                    // ***** 改行のとき *****
+                    if (ch == "\r" || ch == "\n") { break; }
+                    // ***** その他のとき *****
+                    i++;
+                }
+                // token_push(51);
+                continue;
+            }
+            // ***** 複数行コメントのとき *****
+            if (ch == "#" && ch2 == "|") {
+                i++;
+                comment_nest = 1;
+                while (i < src_st_len) {
+                    // ***** 1文字取り出す *****
+                    ch = src_st.charAt(i++);
+                    if (i < src_st_len) { ch2 = src_st.charAt(i); } else { ch2 = ""; }
+                    // ***** 複数行コメント開始のとき *****
+                    if (ch == "#" && ch2 == "|") { i++; comment_nest++; }
+                    // ***** 複数行コメント終了のとき *****
+                    if (ch == "|" && ch2 == "#") {
+                        i++; comment_nest--;
+                        if (comment_nest <= 0) { break; }
+                    }
+                    // ***** 改行のとき *****
+                    if (ch == "\r" || ch == "\n") { line_no++; if (ch == "\r" && ch2 == "\n") { i++; } }
+                }
+                // token_push(52);
+                continue;
+            }
+            // ***** S式コメントのとき *****
+            if (ch == "#" && ch2 == ";") {
+                i++;
+                // token_push(53);
+                token_push(3);
+                continue;
+            }
+            // ***** シンボルまたは文字列のとき *****
+            if (ch == "|" || ch == "\"") {
+                delim_ch = ch;
+                i--;
+                while (i < src_st_len) {
+                    // ***** 1文字取り出す *****
+                    ch = src_st.charAt(i++);
+                    if (i < src_st_len) { ch2 = src_st.charAt(i); } else { ch2 = ""; }
+                    // ***** デリミタのとき *****
+                    if (ch != "\\" && ch2 == delim_ch) { i++; break; }
+                    // ***** 改行のとき *****
+                    if (ch == "\r" || ch == "\n") { line_no++; if (ch == "\r" && ch2 == "\n") { i++; } }
+                }
+                token_push(100);
+                continue;
+            }
+            // ***** 不完全文字列または補間文字列または旧補間文字列のとき *****
+            if (ch == "#" && (ch2 == "*" || ch2 == "\"" || ch2 == "`")) {
+                i++;
+                string_start = true;
+                if (ch2 == "*" || ch2 == "`") {
+                    if (i < src_st_len && src_st.charAt(i) == "\"") {
+                        i++;
+                    } else {
+                        string_start = false;
+                    }
+                }
+                if (string_start == true) {
+                    i--;
+                    while (i < src_st_len) {
+                        // ***** 1文字取り出す *****
+                        ch = src_st.charAt(i++);
+                        if (i < src_st_len) { ch2 = src_st.charAt(i); } else { ch2 = ""; }
+                        // ***** デリミタのとき *****
+                        if (ch != "\\" && ch2 == "\"") { i++; break; }
+                        // ***** 改行のとき *****
+                        if (ch == "\r" || ch == "\n") { line_no++; if (ch == "\r" && ch2 == "\n") { i++; } }
+                    }
+                    token_push(100);
+                    continue;
+                }
+                // ***** その他のとき *****
+                ch = "";
+                ch2 = "";
+                // (そのまま下におりてデリミタまでを登録)
+            }
+            // ***** 文字集合または正規表現のとき *****
+            if (ch == "#" && (ch2 == "[" || ch2 == "/")) {
+                if (ch2 == "[") { delim_ch = "]"; } else { delim_ch = "/"; }
+                i++;
+                i--;
+                while (i < src_st_len) {
+                    // ***** 1文字取り出す *****
+                    ch = src_st.charAt(i++);
+                    if (i < src_st_len) { ch2 = src_st.charAt(i); } else { ch2 = ""; }
+                    // ***** デリミタのとき *****
+                    if (ch != "\\" && ch2 == delim_ch) {
+                        i++;
+                        // ***** 正規表現の末尾にiがあるとき *****
+                        if (delim_ch == "/") {
+                            if (i < src_st_len && src_st.charAt(i) == "i") { i++; }
+                        }
+                        break;
+                    }
+                    // ***** 改行のとき *****
+                    if (ch == "\r" || ch == "\n") { line_no++; if (ch == "\r" && ch2 == "\n") { i++; } }
+                }
+                token_push(100);
+                continue;
+            }
+            // ***** 文字リテラルのとき *****
+            if (ch == "#" && ch2 == "\\") {
+                i++;
+                if (i < src_st_len) {
+                    // ***** 1文字取り出す *****
+                    ch = src_st.charAt(i);
+                    // ***** 記号文字のとき *****
+                    if ("|()\";[]{}\\#".indexOf(ch) >= 0) {
+                        i++;
+                        token_push(100);
+                        continue;
+                    }
+                }
+                // ***** その他のとき *****
+                ch = "";
+                ch2 = "";
+                // (そのまま下におりてデリミタまでを登録)
+            }
+            // ***** その他のとき *****
+            while (i < src_st_len) {
+                // ***** 1文字取り出す *****
+                ch = src_st.charAt(i);
+                // ***** デリミタのとき *****
+                if (" \t\r\n|()\";[]{}".indexOf(ch) >= 0) { break; }
+                // ***** その他のとき *****
+                i++;
+            }
+            token_push(100);
+        }
+        // ***** 終端4個追加(安全のため) *****
+        token_push(100, ";end");
+        token_push(100, ";end");
+        token_push(100, ";end");
+        token_push(100, ";end");
+    }
+
+    // ***** 演算子情報の生成 *****
+    function make_optable() {
+        var i;
+        var op_obj = {};
+
+        // ***** 演算子情報の生成 *****
+        operator_table = {};
+        for (i = 0; i < operator_data.length; i++) {
+            op_obj = {};
+            op_obj.operator  = operator_data[i][1];
+            op_obj.param_num = operator_data[i][2];
+            op_obj.priority  = operator_data[i][3];
+            operator_table[operator_data[i][0]] = op_obj;
+        }
+    }
+
+    // ***** コード追加 *****
+    function code_push(word, pos1, pos2) {
+        var cd = {};
+        cd.word = word;
+        cd.pos1 = pos1;
+        cd.pos2 = pos2;
+        cd.opt = 0;
+        code.push(cd);
+    }
+
+    // ***** コード挿入 *****
+    function code_insert(i, word, pos1, pos2) {
+        var cd = {};
+        cd.word = word;
+        cd.pos1 = pos1;
+        cd.pos2 = pos2;
+        cd.opt = 0;
+        code.splice(i, 0, cd);
+    }
+
+    // ***** HTML文字列のエスケープ処理 *****
+    function escape_html(html_st) {
+        return html_st
+            .replace(/&/g,   "&amp;")
+            .replace(/[<]/g, "&lt;")
+            .replace(/>/g,   "&gt;")
+            .replace(/"/g,   "&quot;")
+            .replace(/'/g,   "&#39;");
+    }
+
+    // ***** 数値チェック *****
+    function isDigit(ch) {
+        // if (ch.match(/^[0-9]+$/)) { return true; }
+        var c = ch.charCodeAt(0);
+        if (c >= 0x30 && c <= 0x39) { return true; }
+        return false;
+    }
+
+
+})(SCInfix || (SCInfix = {}));
+
+
+// -->
+</script>
+</head>
+
+<body class="main_container">
+
+<form action="#" onsubmit="convert_button(); return false;">
+<table width="95%"><tr>
+<th align="center" colspan="3">SCInfix</th>
+</tr><tr>
+<th align="left" valign="top">src:</th>
+<th align="left" width="95%"><textarea id="src_text1" cols="40" rows="10" style="width: 100%;"></textarea></th>
+<th></th>
+</tr><tr>
+<th></th>
+<th align="left"><input type="submit" value="convert"> &nbsp;
+<input type="button" value="clear" onclick="clear_button();"> &nbsp;
+<input type="checkbox" id="curly_conv" checked>: use { } conversion</th>
+<th></th>
+</tr><tr>
+<th align="left" valign="top">out:</th>
+<th align="left" width="95%"><textarea id="out_text1" cols="40" rows="10" style="width: 100%;"></textarea></th>
+<th></th>
+</tr><tr>
+<th></th>
+<th align="left"><input type="button" value="sample1" onclick="sample_button(0);">
+<input type="button" value="sample2" onclick="sample_button(1);">
+<input type="button" value="sample3" onclick="sample_button(2);"></th>
+<th></th>
+</tr></table>
+<pre><span id="debug_show1"></span></pre>
+<pre><span id="result_show1"></span></pre>
+</form>
+
+</body>
+</html>
