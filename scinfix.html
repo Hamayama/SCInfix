@@ -5,7 +5,7 @@
 <title>SCInfix</title>
 <!--
     scinfix.html
-    2015-10-30 v1.03
+    2015-10-30 v1.04
 -->
 <style type="text/css">
 <!--
@@ -40,6 +40,7 @@ function convert_button() {
     var ret;
     var src_st;
     var curly_conv;
+    var line_feed;
     var result = {};
 
     // ***** 戻り値の初期化 *****
@@ -49,13 +50,15 @@ function convert_button() {
     // ***** 要素の存在チェック *****
     if (!document.getElementById("src_text1"))    { Alm("convert_button:0001"); return ret; }
     if (!document.getElementById("curly_conv"))   { Alm("convert_button:0002"); return ret; }
-    if (!document.getElementById("out_text1"))    { Alm("convert_button:0003"); return ret; }
-    if (!document.getElementById("result_show1")) { Alm("convert_button:0004"); return ret; }
+    if (!document.getElementById("line_feed"))    { Alm("convert_button:0003"); return ret; }
+    if (!document.getElementById("out_text1"))    { Alm("convert_button:0004"); return ret; }
+    if (!document.getElementById("result_show1")) { Alm("convert_button:0005"); return ret; }
     // ***** ソースの取得 *****
     src_st = document.getElementById("src_text1").value;
     curly_conv = document.getElementById("curly_conv").checked;
+    line_feed = document.getElementById("line_feed").checked;
     // ***** 変換実行 *****
-    result = SCInfix.convert(src_st, curly_conv);
+    result = SCInfix.convert(src_st, curly_conv, line_feed);
     // ***** 出力の表示 *****
     document.getElementById("out_text1").value = result.out;
     document.getElementById("result_show1").innerHTML = result.html;
@@ -135,9 +138,10 @@ function sample_button(sample_no) {
 //
 // 公開I/F :
 //
-//   SCInfix.convert(src_st, curly_conv)  変換実行
+//   SCInfix.convert(src_st, curly_conv, line_feed)  変換実行
 //     src_st      ソース(文字列)
 //     curly_conv  波括弧変換フラグ(boolean)
+//     line_feed   改行反映フラグ(boolean)
 //     戻り値      結果オブジェクト
 //                   result.out   テキスト出力(文字列)
 //                   result.html  HTML出力(文字列)
@@ -189,6 +193,7 @@ var SCInfix;
     // ***** 変数 *****
     var src_st;              // ソース(文字列)
     var curly_conv;          // 波括弧変換フラグ(boolean)
+    var line_feed;           // 改行反映フラグ(boolean)
     var out_st;              // テキスト出力(文字列)
     var html_st;             // HTML出力(文字列)
     var operator_table = {}; // 演算子情報(連想配列オブジェクト)
@@ -196,7 +201,7 @@ var SCInfix;
                              //   operator_table[funcname].param_num  引数の数(負の数は特殊)
                              //   operator_table[funcname].priority   優先順位(大きいほど優先)
     var token = [];          // トークン(配列)
-                             //   token[i].kind     種別(=0:改行(未使用),
+                             //   token[i].kind     種別(=0:改行,
                              //                          =1:開き括弧,
                              //                          =2:閉じ括弧,
                              //                          =3:クォート等の要素の前につく記号,
@@ -217,7 +222,7 @@ var SCInfix;
     // ***** 公開I/F *****
 
     // ***** 変換実行 *****
-    function convert(src_st1, curly_conv1) {
+    function convert(src_st1, curly_conv1, line_feed1) {
         var result = {}; // 戻り値
 
         // ***** 戻り値の初期化 *****
@@ -231,6 +236,8 @@ var SCInfix;
         src_st = src_st1;
         // ***** 波括弧変換フラグの取得 *****
         curly_conv = curly_conv1;
+        // ***** 改行反映フラグの取得 *****
+        line_feed = line_feed1;
         // ***** 演算子情報の生成 *****
         make_optable();
         // ***** トークン分割 *****
@@ -344,14 +351,20 @@ var SCInfix;
     }
     // ***** プログラムのコンパイル *****
     function c_prog(tok_start, tok_end) {
-        var i;
+        var i, i2, i2_old;
         // ***** トークン解析のループ *****
         i = tok_start;
         while (i < tok_end) {
             // ***** S式のコンパイル *****
+            i2_old = code.length;
             i = c_sexpr(i, tok_end, false, 0);
-            code_push(";", debugpos1, i);
-            code_push("\n", debugpos1, i);
+            i2 = code.length;
+            if (i2 > i2_old && !(i2 > 0 && code[i2 - 1].word == "\n")) {
+                code_push(";", debugpos1, i);
+                if (!line_feed) {
+                    code_push("\n", debugpos1, i);
+                }
+            }
         }
     }
     // ***** S式のコンパイル *****
@@ -370,6 +383,15 @@ var SCInfix;
         // ***** 終端のとき *****
         if (tok.word == ";end") {
             i++;
+            return i;
+        }
+
+        // ***** 改行のとき *****
+        if (tok.kind == 0) {
+            i++;
+            if (line_feed) {
+                code_push("\n", debugpos1, i);
+            }
             return i;
         }
 
@@ -638,7 +660,7 @@ var SCInfix;
             if (ch == "\r" || ch == "\n") {
                 line_no++;
                 if (ch == "\r" && ch2 == "\n") { i++; }
-                // token_push(0);
+                token_push(0);
                 continue;
             }
             // ***** 波括弧「{ ～ }」のとき *****
@@ -779,7 +801,12 @@ var SCInfix;
                         if (comment_nest <= 0) { break; }
                     }
                     // ***** 改行のとき *****
-                    if (ch == "\r" || ch == "\n") { line_no++; if (ch == "\r" && ch2 == "\n") { i++; } }
+                    // if (ch == "\r" || ch == "\n") { line_no++; if (ch == "\r" && ch2 == "\n") { i++; } }
+                    if (ch == "\r" || ch == "\n") {
+                        line_no++;
+                        if (ch == "\r" && ch2 == "\n") { i++; }
+                        token_push(0, "\n");
+                    }
                 }
                 // token_push(52);
                 continue;
@@ -972,7 +999,8 @@ var SCInfix;
 <th></th>
 <th align="left"><input type="submit" value="convert"> &nbsp;
 <input type="button" value="clear" onclick="clear_button();"> &nbsp;
-<input type="checkbox" id="curly_conv" checked>: use { } conversion</th>
+<input type="checkbox" id="curly_conv" checked>: use { } conversion &nbsp;
+<input type="checkbox" id="line_feed" checked>: use line feed</th>
 <th></th>
 </tr><tr>
 <th align="left" valign="top">out:</th>
