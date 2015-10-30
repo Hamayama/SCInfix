@@ -5,7 +5,7 @@
 <title>SCInfix</title>
 <!--
     scinfix.html
-    2015-10-30 v1.04
+    2015-10-31 v1.05
 -->
 <style type="text/css">
 <!--
@@ -191,33 +191,34 @@ var SCInfix;
         ["define",   "=",      2,       5]];
 
     // ***** 変数 *****
-    var src_st;              // ソース(文字列)
-    var curly_conv;          // 波括弧変換フラグ(boolean)
-    var line_feed;           // 改行反映フラグ(boolean)
-    var out_st;              // テキスト出力(文字列)
-    var html_st;             // HTML出力(文字列)
-    var operator_table = {}; // 演算子情報(連想配列オブジェクト)
-                             //   operator_table[funcname].operator   演算子
-                             //   operator_table[funcname].param_num  引数の数(負の数は特殊)
-                             //   operator_table[funcname].priority   優先順位(大きいほど優先)
-    var token = [];          // トークン(配列)
-                             //   token[i].kind     種別(=0:改行,
-                             //                          =1:開き括弧,
-                             //                          =2:閉じ括弧,
-                             //                          =3:クォート等の要素の前につく記号,
-                             //                          =51:1行コメント(未使用),
-                             //                          =52:複数行コメント(未使用),
-                             //                          =53:S式コメント(未使用),
-                             //                          =100:その他)
-                             //   token[i].word     単語(文字列)
-                             //   token[i].line_no  行番号(1オリジン)
-    var code = [];           // コード(配列)
-                             //   code[i].word      単語(文字列)
-                             //   code[i].pos1      デバッグ位置1
-                             //   code[i].pos2      デバッグ位置2
-                             //   code[i].opt       最適化用情報(未使用)
-    var debugpos1;           // デバッグ位置1
-    var debugpos2;           // デバッグ位置2
+    var src_st;               // ソース(文字列)
+    var curly_conv;           // 波括弧変換フラグ(boolean)
+    var line_feed;            // 改行反映フラグ(boolean)
+    var out_st;               // テキスト出力(文字列)
+    var html_st;              // HTML出力(文字列)
+    var operator_table = {};  // 演算子情報(連想配列オブジェクト)
+                              //   operator_table[funcname].operator   演算子
+                              //   operator_table[funcname].param_num  引数の数(負の数は特殊)
+                              //   operator_table[funcname].priority   優先順位(大きいほど優先)
+    var operator_table2 = {}; // 演算子情報2(連想配列オブジェクト)
+    var token = [];           // トークン(配列)
+                              //   token[i].kind     種別(=0:改行,
+                              //                          =1:開き括弧,
+                              //                          =2:閉じ括弧,
+                              //                          =3:クォート等の要素の前につく記号,
+                              //                          =51:1行コメント(未使用),
+                              //                          =52:複数行コメント(未使用),
+                              //                          =53:S式コメント(未使用),
+                              //                          =100:その他)
+                              //   token[i].word     単語(文字列)
+                              //   token[i].line_no  行番号(1オリジン)
+    var code = [];            // コード(配列)
+                              //   code[i].word      単語(文字列)
+                              //   code[i].pos1      デバッグ位置1
+                              //   code[i].pos2      デバッグ位置2
+                              //   code[i].opt       最適化用情報(未使用)
+    var debugpos1;            // デバッグ位置1
+    var debugpos2;            // デバッグ位置2
 
     // ***** 公開I/F *****
 
@@ -260,8 +261,11 @@ var SCInfix;
     // ***** 出力の生成 *****
     function make_output() {
         var i;
+        var wd;
         var code_length; // コード数
         var arr_st = []; // 文字列の配列
+        var add_space_flag1;
+        var add_space_flag2;
 
         // ***** テキスト出力の生成 *****
         out_st = "";
@@ -269,11 +273,19 @@ var SCInfix;
         code_length = code.length;
         for (i = 0; i < code_length; i++) {
             // ***** 単語を追加 *****
-            if (code[i].word.length >= 2 &&
-                (code[i].word.charAt(0) == "+" || code[i].word.charAt(0) == "-")) {
-                arr_st.push(" ");
+            wd = code[i].word;
+            add_space_flag1 = false;
+            add_space_flag2 = false;
+            if (operator_table2.hasOwnProperty(wd) || wd == ":") {
+                add_space_flag1 = true;
+                add_space_flag2 = true;
             }
-            arr_st.push(code[i].word);
+            if (wd == ",") {
+                add_space_flag2 = true;
+            }
+            if (add_space_flag1) { arr_st.push(" "); }
+            arr_st.push(wd);
+            if (add_space_flag2) { arr_st.push(" "); }
         }
         out_st = arr_st.join("");
 
@@ -283,11 +295,19 @@ var SCInfix;
         code_length = code.length;
         for (i = 0; i < code_length; i++) {
             // ***** 単語をサニタイズ(タグ無効化)してから追加 *****
-            if (code[i].word.length >= 2 &&
-                (code[i].word.charAt(0) == "+" || code[i].word.charAt(0) == "-")) {
-                arr_st.push(" ");
+            wd = code[i].word;
+            add_space_flag1 = false;
+            add_space_flag2 = false;
+            if (operator_table2.hasOwnProperty(wd) || wd == ":") {
+                add_space_flag1 = true;
+                add_space_flag2 = true;
             }
-            arr_st.push(escape_html(code[i].word));
+            if (wd == ",") {
+                add_space_flag2 = true;
+            }
+            if (add_space_flag1) { arr_st.push(" "); }
+            arr_st.push(escape_html(wd));
+            if (add_space_flag2) { arr_st.push(" "); }
         }
         html_st = arr_st.join("");
 
@@ -308,6 +328,8 @@ var SCInfix;
     function compile() {
         var i;
         var msg;
+        var tok_end;
+        var line_feed_num = 0;
 
         // ***** コンパイル *****
         code = [];
@@ -315,11 +337,28 @@ var SCInfix;
         debugpos2 = 0;
         try {
             // ***** プログラムのコンパイル *****
-            c_prog(0, token.length - 4); // 終端4個分マイナス
+            tok_end = token.length - 4; // 終端4個分マイナス
+            line_feed_num = 0;
+            while (tok_end > 0) {
+                // ***** 末尾の改行を削除 *****
+                if (token[tok_end - 1].kind == 0) {
+                    line_feed_num++;
+                    tok_end--;
+                    continue;
+                }
+                break;
+            }
+            c_prog(0, tok_end);
+            if (line_feed) {
+                // ***** 末尾の改行を戻す *****
+                for (i = 0; i < line_feed_num; i++) {
+                    code_push("\n", debugpos1, tok_end);
+                }
+            }
             for (i = 0; i < code.length; i++) {
                 // ***** 生成コードに終端がまざっていたとき *****
                 if (code[i].word == ";end") {
-                    debugpos2 = token.length - 4; // 終端4個分マイナス
+                    debugpos2 = tok_end;
                     throw new Error("文が未完成です。");
                 }
             }
@@ -351,19 +390,15 @@ var SCInfix;
     }
     // ***** プログラムのコンパイル *****
     function c_prog(tok_start, tok_end) {
-        var i, i2, i2_old;
+        var i;
         // ***** トークン解析のループ *****
         i = tok_start;
         while (i < tok_end) {
             // ***** S式のコンパイル *****
-            i2_old = code.length;
             i = c_sexpr(i, tok_end, false, 0);
-            i2 = code.length;
-            if (i2 > i2_old && !(i2 > 0 && code[i2 - 1].word == "\n")) {
-                code_push(";", debugpos1, i);
-                if (!line_feed) {
-                    code_push("\n", debugpos1, i);
-                }
+            code_push(";", debugpos1, i);
+            if (!line_feed) {
+                code_push("\n", debugpos1, i);
             }
         }
     }
@@ -371,14 +406,45 @@ var SCInfix;
     function c_sexpr(tok_start, tok_end, quote_flag, priority) {
         var i;
         var tok;
+        var tok_start2;
         var op_obj = {};
         var param_count;
         var code_pos1;
+        var line_feed_num = 0;
+
+        // ***** トークン取り出し *****
+        function get_token() {
+            var tok = null;
+            while (i < tok_end) {
+                tok = token[i];
+                // ***** 改行のとき *****
+                if (tok.kind == 0) {
+                    i++;
+                    line_feed_num++;
+                    continue;
+                }
+                break;
+            }
+            return (tok || token[i]);
+        }
+        // ***** 改行の出力 *****
+        function output_line_feed() {
+            var i2;
+            if (line_feed) {
+                for (i2 = 0; i2 < line_feed_num; i2++) {
+                    code_push("\n", debugpos1, i);
+                }
+            }
+            line_feed_num = 0;
+        }
 
         // ***** トークン取り出し *****
         i = tok_start;
         debugpos1 = i;
-        tok = token[i];
+        tok = get_token();
+        output_line_feed();
+        tok_start2 = i;
+        debugpos1 = i;
 
         // ***** 終端のとき *****
         if (tok.word == ";end") {
@@ -389,16 +455,13 @@ var SCInfix;
         // ***** 改行のとき *****
         if (tok.kind == 0) {
             i++;
-            if (line_feed) {
-                code_push("\n", debugpos1, i);
-            }
             return i;
         }
 
         // ***** 閉じ括弧のとき *****
         if (tok.kind == 2) {
             i++;
-            debugpos1 = tok_start;
+            debugpos1 = tok_start2;
             debugpos2 = i;
             throw new Error("閉じ括弧が多すぎます。");
         }
@@ -420,7 +483,7 @@ var SCInfix;
             param_count = 0;
             while (i < tok_end) {
                 // ***** トークン取り出し *****
-                tok = token[i];
+                tok = get_token();
                 // ***** 閉じ括弧のとき *****
                 if (tok.kind == 2) { i++; break; }
                 // ***** S式のコンパイル *****
@@ -428,11 +491,13 @@ var SCInfix;
                 if (param_count > 1) {
                     code_push(",", debugpos1, i);
                 }
+                output_line_feed();
                 i = c_sexpr(i, tok_end, quote_flag, 0);
             }
+            output_line_feed();
             // ***** 閉じ括弧がなかったとき *****
             if (tok.kind != 2) {
-                debugpos1 = tok_start;
+                debugpos1 = tok_start2;
                 debugpos2 = i;
                 throw new Error("閉じ括弧がありません。");
             }
@@ -446,15 +511,17 @@ var SCInfix;
         if (tok.kind == 1) {
             i++;
             // ***** トークン取り出し *****
-            tok = token[i];
+            tok = get_token();
             // ***** 閉じ括弧のとき *****
             // (空の配列 [ ] に変換する)
             if (tok.kind == 2) {
                 i++;
                 code_push("[", debugpos1, i);
+                output_line_feed();
                 code_push("]", debugpos1, i);
                 return i;
             }
+            output_line_feed();
 
             // ***** 演算子に対応する手続きのとき *****
             // (式 x=a+b 等 に変換する)
@@ -472,11 +539,12 @@ var SCInfix;
                 param_count = 0;
                 while (i < tok_end) {
                     // ***** トークン取り出し *****
-                    tok = token[i];
+                    tok = get_token();
                     // ***** 閉じ括弧のとき *****
                     if (tok.kind == 2) { i++; break; }
                     // ***** S式のコンパイル *****
                     param_count++;
+                    if (param_count > op_obj.param_num && op_obj.param_num != -1) { i++; break; }
                     if (param_count > 1) {
                         if (param_count == 3 && op_obj.operator == "?") {
                             code_push(":", debugpos1, i);
@@ -484,9 +552,10 @@ var SCInfix;
                             code_push(op_obj.operator, debugpos1, i);
                         }
                     }
+                    output_line_feed();
                     i = c_sexpr(i, tok_end, quote_flag, op_obj.priority);
-                    if (param_count > op_obj.param_num && op_obj.param_num != -1) { break; }
                 }
+                output_line_feed();
                 // ***** 引数の数をチェック *****
                 if (param_count == 1 && op_obj.operator == "-") {
                     code_insert(code_pos1, op_obj.operator, debugpos1, i);
@@ -501,12 +570,12 @@ var SCInfix;
                     code_push("0", debugpos1, i);
                 }
                 if (param_count == 0) {
-                    debugpos1 = tok_start;
+                    debugpos1 = tok_start2;
                     debugpos2 = i;
                     throw new Error("引数がありません。");
                 }
                 if (param_count != op_obj.param_num && op_obj.param_num != -1) {
-                    debugpos1 = tok_start;
+                    debugpos1 = tok_start2;
                     debugpos2 = i;
                     if (op_obj.operator == "?") {
                         throw new Error("引数の数が不正です (引数が2個か3個である必要があります)。");
@@ -516,7 +585,7 @@ var SCInfix;
                 }
                 // ***** 閉じ括弧がなかったとき *****
                 if (tok.kind != 2) {
-                    debugpos1 = tok_start;
+                    debugpos1 = tok_start2;
                     debugpos2 = i;
                     throw new Error("閉じ括弧がありません。");
                 }
@@ -534,7 +603,7 @@ var SCInfix;
                 param_count = 0;
                 while (i < tok_end) {
                     // ***** トークン取り出し *****
-                    tok = token[i];
+                    tok = get_token();
                     // ***** 閉じ括弧のとき *****
                     if (tok.kind == 2) { i++; break; }
                     // ***** S式のコンパイル *****
@@ -542,20 +611,22 @@ var SCInfix;
                     if (param_count > 1) {
                         code_push("[", debugpos1, i);
                     }
+                    output_line_feed();
                     i = c_sexpr(i, tok_end, quote_flag, 0);
                     if (param_count > 1) {
                         code_push("]", debugpos1, i);
                     }
                 }
+                output_line_feed();
                 // ***** 引数の数をチェック *****
                 if (param_count <= 1) {
-                    debugpos1 = tok_start;
+                    debugpos1 = tok_start2;
                     debugpos2 = i;
                     throw new Error("引数が足りません。");
                 }
                 // ***** 閉じ括弧がなかったとき *****
                 if (tok.kind != 2) {
-                    debugpos1 = tok_start;
+                    debugpos1 = tok_start2;
                     debugpos2 = i;
                     throw new Error("閉じ括弧がありません。");
                 }
@@ -565,14 +636,29 @@ var SCInfix;
             // ***** クォートまたは準クォートのとき *****
             if (tok.word == "quote" || tok.word == "quasiquote") {
                 i++;
-                // ***** S式のコンパイル *****
-                i = c_sexpr(i, tok_end, true, 0);
-                // ***** トークン取り出し *****
-                tok = token[i];
-                i++;
+                // ***** トークン解析のループ *****
+                param_count = 0;
+                while (i < tok_end) {
+                    // ***** トークン取り出し *****
+                    tok = get_token();
+                    // ***** 閉じ括弧のとき *****
+                    if (tok.kind == 2) { i++; break; }
+                    // ***** S式のコンパイル *****
+                    param_count++;
+                    if (param_count > 1) { i++; break; }
+                    output_line_feed();
+                    i = c_sexpr(i, tok_end, true, 0);
+                }
+                output_line_feed();
+                // ***** 引数の数をチェック *****
+                if (param_count != 1) {
+                    debugpos1 = tok_start2;
+                    debugpos2 = i;
+                    throw new Error("引数の数が不正です (引数が1個である必要があります)。");
+                }
                 // ***** 閉じ括弧がなかったとき *****
                 if (tok.kind != 2) {
-                    debugpos1 = tok_start;
+                    debugpos1 = tok_start2;
                     debugpos2 = i;
                     throw new Error("閉じ括弧がありません。");
                 }
@@ -588,7 +674,7 @@ var SCInfix;
             param_count = 0;
             while (i < tok_end) {
                 // ***** トークン取り出し *****
-                tok = token[i];
+                tok = get_token();
                 // ***** 閉じ括弧のとき *****
                 if (tok.kind == 2) { i++; break; }
                 // ***** S式のコンパイル *****
@@ -596,11 +682,13 @@ var SCInfix;
                 if (param_count > 1) {
                     code_push(",", debugpos1, i);
                 }
+                output_line_feed();
                 i = c_sexpr(i, tok_end, quote_flag, 0);
             }
+            output_line_feed();
             // ***** 閉じ括弧がなかったとき *****
             if (tok.kind != 2) {
-                debugpos1 = tok_start;
+                debugpos1 = tok_start2;
                 debugpos2 = i;
                 throw new Error("閉じ括弧がありません。");
             }
@@ -931,12 +1019,14 @@ var SCInfix;
 
         // ***** 演算子情報の生成 *****
         operator_table = {};
+        operator_table2 = {};
         for (i = 0; i < operator_data.length; i++) {
             op_obj = {};
             op_obj.operator  = operator_data[i][1];
             op_obj.param_num = operator_data[i][2];
             op_obj.priority  = operator_data[i][3];
             operator_table[operator_data[i][0]] = op_obj;
+            operator_table2[operator_data[i][1]] = true;
         }
     }
 
