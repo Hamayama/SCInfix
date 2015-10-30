@@ -5,7 +5,7 @@
 <title>SCInfix</title>
 <!--
     scinfix.html
-    2015-10-30 v1.02
+    2015-10-30 v1.03
 -->
 <style type="text/css">
 <!--
@@ -348,6 +348,7 @@ var SCInfix;
         // ***** トークン解析のループ *****
         i = tok_start;
         while (i < tok_end) {
+            // ***** S式のコンパイル *****
             i = c_sexpr(i, tok_end, false, 0);
             code_push(";", debugpos1, i);
             code_push("\n", debugpos1, i);
@@ -372,9 +373,18 @@ var SCInfix;
             return i;
         }
 
+        // ***** 閉じ括弧のとき *****
+        if (tok.kind == 2) {
+            i++;
+            debugpos1 = tok_start;
+            debugpos2 = i;
+            throw new Error("閉じ括弧が多すぎます。");
+        }
+
         // ***** クォート等のとき *****
         if (tok.kind == 3) {
             i++;
+            // ***** S式のコンパイル *****
             i = c_sexpr(i, tok_end, true, 0);
             return i;
         }
@@ -521,6 +531,23 @@ var SCInfix;
                     debugpos2 = i;
                     throw new Error("引数が足りません。");
                 }
+                // ***** 閉じ括弧がなかったとき *****
+                if (tok.kind != 2) {
+                    debugpos1 = tok_start;
+                    debugpos2 = i;
+                    throw new Error("閉じ括弧がありません。");
+                }
+                return i;
+            }
+
+            // ***** クォートまたは準クォートのとき *****
+            if (tok.word == "quote" || tok.word == "quasiquote") {
+                i++;
+                // ***** S式のコンパイル *****
+                i = c_sexpr(i, tok_end, true, 0);
+                // ***** トークン取り出し *****
+                tok = token[i];
+                i++;
                 // ***** 閉じ括弧がなかったとき *****
                 if (tok.kind != 2) {
                     debugpos1 = tok_start;
