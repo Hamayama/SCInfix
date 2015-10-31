@@ -5,7 +5,7 @@
 <title>SCInfix</title>
 <!--
     scinfix.html
-    2015-10-31 v1.07
+    2015-10-31 v1.08
 -->
 <style type="text/css">
 <!--
@@ -196,7 +196,7 @@ var SCInfix;
     var line_feed;            // 改行反映フラグ(boolean)
     var out_st;               // テキスト出力(文字列)
     var html_st;              // HTML出力(文字列)
-    var operator_table1 = {}; // 演算子情報(連想配列オブジェクト)
+    var operator_table1 = {}; // 演算子情報1(連想配列オブジェクト)
                               //   operator_table1[funcname].operator   演算子
                               //   operator_table1[funcname].param_num  引数の数(負の数は特殊)
                               //   operator_table1[funcname].priority   優先順位(大きいほど優先)
@@ -963,9 +963,7 @@ var SCInfix;
                     // ***** デリミタのとき *****
                     if (ch == delim_ch) {
                         // ***** 正規表現の末尾にiがあるとき *****
-                        if (delim_ch == "/") {
-                            if (i < src_st_len && src_st.charAt(i) == "i") { i++; }
-                        }
+                        if (ch == "/" && ch2 == "i") { i++; }
                         break;
                     }
                     // ***** 改行のとき *****
