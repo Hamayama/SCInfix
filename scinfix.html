@@ -5,7 +5,7 @@
 <title>SCInfix</title>
 <!--
     scinfix.html
-    2015-10-31 v1.05
+    2015-10-31 v1.06
 -->
 <style type="text/css">
 <!--
@@ -201,6 +201,7 @@ var SCInfix;
                               //   operator_table[funcname].param_num  引数の数(負の数は特殊)
                               //   operator_table[funcname].priority   優先順位(大きいほど優先)
     var operator_table2 = {}; // 演算子情報2(連想配列オブジェクト)
+                              //   operator_table2[operator]  演算子の存在チェック用(boolean)
     var token = [];           // トークン(配列)
                               //   token[i].kind     種別(=0:改行,
                               //                          =1:開き括弧,
@@ -261,55 +262,47 @@ var SCInfix;
     // ***** 出力の生成 *****
     function make_output() {
         var i;
-        var wd;
-        var code_length; // コード数
-        var arr_st = []; // 文字列の配列
-        var add_space_flag1;
-        var add_space_flag2;
+
+        // ***** 出力の生成(サブ) *****
+        function make_output_sub(escape_func) {
+            var i;
+            var wd;              // 単語
+            var output_st;       // 出力文字列
+            var code_length;     // コード数
+            var arr_st = [];     // 文字列の配列
+            var add_space_flag1; // 空白追加用1
+            var add_space_flag2; // 空白追加用2
+
+            // ***** 出力の生成(サブ) *****
+            output_st = "";
+            arr_st = [];
+            code_length = code.length;
+            for (i = 0; i < code_length; i++) {
+                // ***** 単語を追加 *****
+                wd = code[i].word;
+                add_space_flag1 = false;
+                add_space_flag2 = false;
+                if (operator_table2.hasOwnProperty(wd) || wd == ":") {
+                    add_space_flag1 = true;
+                    add_space_flag2 = true;
+                }
+                if (wd == ",") {
+                    add_space_flag2 = true;
+                }
+                if (add_space_flag1) { arr_st.push(" "); }
+                arr_st.push(escape_func ? escape_func(wd) : wd);
+                if (add_space_flag2) { arr_st.push(" "); }
+            }
+            output_st = arr_st.join("");
+            return output_st;
+        }
 
         // ***** テキスト出力の生成 *****
-        out_st = "";
-        arr_st = [];
-        code_length = code.length;
-        for (i = 0; i < code_length; i++) {
-            // ***** 単語を追加 *****
-            wd = code[i].word;
-            add_space_flag1 = false;
-            add_space_flag2 = false;
-            if (operator_table2.hasOwnProperty(wd) || wd == ":") {
-                add_space_flag1 = true;
-                add_space_flag2 = true;
-            }
-            if (wd == ",") {
-                add_space_flag2 = true;
-            }
-            if (add_space_flag1) { arr_st.push(" "); }
-            arr_st.push(wd);
-            if (add_space_flag2) { arr_st.push(" "); }
-        }
-        out_st = arr_st.join("");
+        out_st = make_output_sub(null);
 
         // ***** HTML出力の生成 *****
-        html_st = "";
-        arr_st = [];
-        code_length = code.length;
-        for (i = 0; i < code_length; i++) {
-            // ***** 単語をサニタイズ(タグ無効化)してから追加 *****
-            wd = code[i].word;
-            add_space_flag1 = false;
-            add_space_flag2 = false;
-            if (operator_table2.hasOwnProperty(wd) || wd == ":") {
-                add_space_flag1 = true;
-                add_space_flag2 = true;
-            }
-            if (wd == ",") {
-                add_space_flag2 = true;
-            }
-            if (add_space_flag1) { arr_st.push(" "); }
-            arr_st.push(escape_html(wd));
-            if (add_space_flag2) { arr_st.push(" "); }
-        }
-        html_st = arr_st.join("");
+        // (単語をサニタイズ(タグ無効化)してから追加)
+        html_st = make_output_sub(escape_html);
 
         // ***** デバッグ表示 *****
         if (0) {
@@ -341,6 +334,7 @@ var SCInfix;
             line_feed_num = 0;
             while (tok_end > 0) {
                 // ***** 末尾の改行を削除 *****
+                // (改行のスキップにより、1回多く読み込んでしまうことを回避するため)
                 if (token[tok_end - 1].kind == 0) {
                     line_feed_num++;
                     tok_end--;
@@ -413,6 +407,7 @@ var SCInfix;
         var line_feed_num = 0;
 
         // ***** トークン取り出し *****
+        // (改行をスキップする)
         function get_token() {
             var tok = null;
             while (i < tok_end) {
@@ -428,6 +423,7 @@ var SCInfix;
             return (tok || token[i]);
         }
         // ***** 改行の出力 *****
+        // (演算子の直前で改行しないように、呼び出すタイミングに注意する)
         function output_line_feed() {
             var i2;
             if (line_feed) {
@@ -720,7 +716,6 @@ var SCInfix;
         // ***** トークン追加 *****
         function token_push(kind, word) {
             var tk = {};
-            // ***** トークン追加 *****
             tk.kind = kind;
             if (word == null) {
                 tk.word = src_st.substring(i_start, i);
