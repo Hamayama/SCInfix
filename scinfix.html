@@ -5,7 +5,7 @@
 <title>SCInfix</title>
 <!--
     scinfix.html
-    2015-11-2 v1.09
+    2015-11-2 v1.10
 -->
 <style type="text/css">
 <!--
@@ -410,6 +410,7 @@ var SCInfix;
         var tok_start2;
         var line_feed_num = 0;
         var op_obj = {};
+        var op_obj2 = {};
         var param_count;
         var tok_pos1;
         var code_pos1;
@@ -560,8 +561,11 @@ var SCInfix;
                         plus_minus_flag = true;
                         i = tok_pos1;
                         param_count = 0;
-                        op_obj.priority = 30;
-                        op_obj.param_num = -1;
+                        op_obj2 = {};
+                        op_obj2.operator = op_obj.operator;
+                        op_obj2.param_num = -1;
+                        op_obj2.priority = 30;
+                        op_obj = op_obj2;
                         code.splice(code_pos1, code.length - code_pos1);
                         if (op_obj.priority <= priority) {
                             code_push("(", debugpos1, i);
