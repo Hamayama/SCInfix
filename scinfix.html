@@ -5,7 +5,7 @@
 <title>SCInfix</title>
 <!--
     scinfix.html
-    2015-10-31 v1.08
+    2015-11-2 v1.09
 -->
 <style type="text/css">
 <!--
@@ -156,37 +156,42 @@ var SCInfix;
         ["expt",     "**",     2,      90],
         ["not",      "!",      1,      80],
         ["lognot",   "~",      1,      80],
+        ["+",        "+",      1,      80], // 単項
+        ["-",        "-",      1,      80], // 単項
+        ["+.",       "+",      1,      80], // 単項
+        ["-.",       "-",      1,      80], // 単項
         ["*",        "*",      -1,     40],
         ["/",        "/",      -1,     40],
         ["*.",       "*",      -1,     40],
         ["/.",       "/",      -1,     40],
         ["quotient", "\\",     2,      40],
         ["modulo",   "%",      2,      40],
-        ["+",        "+",      -1,     30],
-        ["-",        "-",      -1,     30],
-        ["+.",       "+",      -1,     30],
-        ["-.",       "-",      -1,     30],
+        // ["+",        "+",      -1,     30], // 2項
+        // ["-",        "-",      -1,     30], // 2項
+        // ["+.",       "+",      -1,     30], // 2項
+        // ["-.",       "-",      -1,     30], // 2項
         ["string-append", "%%", -1,    30],
         // ["ash",      "<<",     2,      25], // 負の引数が判定できない
         ["shl",      "<<",     2,      25], // Schemeには存在しない
         ["shr",      ">>>",    2,      25], // Schemeには存在しない
         ["sal",      "<<",     2,      25], // Schemeには存在しない
         ["sar",      ">>",     2,      25], // Schemeには存在しない
-        ["<",        "<",      -1,     20],
-        ["<=",       "<=",     -1,     20],
-        [">",        ">",      -1,     20],
-        [">=",       ">=",     -1,     20],
-        ["=",        "==",     -1,     20],
+        ["<",        "<",      -2,     20],
+        ["<=",       "<=",     -2,     20],
+        [">",        ">",      -2,     20],
+        [">=",       ">=",     -2,     20],
+        ["=",        "==",     -2,     20],
         ["eq?",      "==",     2,      20],
         ["eqv?",     "==",     2,      20],
         ["equal?",   "==",     2,      20],
-        ["!=",       "!=",     -1,     20], // Schemeには存在しない
+        ["!=",       "!=",     -2,     20], // Schemeには存在しない
         ["logand",   "&",      -1,     15],
         ["logior",   "|",      -1,     15],
         ["logxor",   "^",      -1,     15],
         ["and",      "&&",     -1,     10],
         ["or",       "||",     -1,     10],
         ["if",       "?",      3,      10], // 引数が2個の場合もある
+        ["begin",    ",",      -1,      5],
         ["set!",     "=",      2,       5],
         ["define",   "=",      2,       5]];
 
@@ -281,14 +286,15 @@ var SCInfix;
             for (i = 0; i < code_length; i++) {
                 // ***** 単語を追加 *****
                 wd = code[i].word;
-                add_space_flag1 = false;
-                add_space_flag2 = false;
-                if (operator_table2.hasOwnProperty(wd) || wd == ":") {
+                if (wd == ",") {
+                    add_space_flag1 = false;
+                    add_space_flag2 = true;
+                } else if (operator_table2.hasOwnProperty(wd) || wd == ":") {
                     add_space_flag1 = true;
                     add_space_flag2 = true;
-                }
-                if (wd == ",") {
-                    add_space_flag2 = true;
+                } else {
+                    add_space_flag1 = false;
+                    add_space_flag2 = false;
                 }
                 if (add_space_flag1) { arr_st.push(" "); }
                 arr_st.push(escape_func ? escape_func(wd) : wd);
@@ -402,10 +408,13 @@ var SCInfix;
         var i;
         var tok;
         var tok_start2;
+        var line_feed_num = 0;
         var op_obj = {};
         var param_count;
+        var tok_pos1;
         var code_pos1;
-        var line_feed_num = 0;
+        var code_pos2;
+        var plus_minus_flag;
 
         // ***** トークン取り出し *****
         // (改行をスキップする)
@@ -525,15 +534,19 @@ var SCInfix;
             op_obj = operator_table1.hasOwnProperty(tok.word) ? operator_table1[tok.word] : null;
             if (op_obj) {
                 i++;
+                tok_pos1 = i;
+                code_pos1 = code.length;
                 if (op_obj.priority <= priority) {
                     code_push("(", debugpos1, i);
                 }
-                code_pos1 = code.length;
-                if (op_obj.param_num == 1) {
+                code_pos2 = code.length;
+                // (単項演算子の挿入)
+                if (op_obj.param_num == 1 && op_obj.operator != "+") {
                     code_push(op_obj.operator, debugpos1, i);
                 }
                 // ***** トークン解析のループ *****
                 param_count = 0;
+                plus_minus_flag = false;
                 while (i < tok_end) {
                     // ***** トークン取り出し *****
                     tok = get_token();
@@ -541,7 +554,22 @@ var SCInfix;
                     if (tok.kind == 2) { i++; break; }
                     // ***** S式のコンパイル *****
                     param_count++;
-                    if (param_count > op_obj.param_num && op_obj.param_num != -1) { i++; break; }
+                    // (演算子が + か - で、単項でなかった場合は、優先順位を変えてやり直す)
+                    if (param_count == 2 && !plus_minus_flag &&
+                        (op_obj.operator == "+" || op_obj.operator == "-")) {
+                        plus_minus_flag = true;
+                        i = tok_pos1;
+                        param_count = 0;
+                        op_obj.priority = 30;
+                        op_obj.param_num = -1;
+                        code.splice(code_pos1, code.length - code_pos1);
+                        if (op_obj.priority <= priority) {
+                            code_push("(", debugpos1, i);
+                        }
+                        continue;
+                    }
+                    if (param_count > op_obj.param_num && op_obj.param_num >= 0) { i++; break; }
+                    // (中置演算子の挿入)
                     if (param_count > 1) {
                         if (param_count == 3 && op_obj.operator == "?") {
                             code_push(":", debugpos1, i);
@@ -554,12 +582,9 @@ var SCInfix;
                 }
                 output_line_feed();
                 // ***** 引数の数をチェック *****
-                if (param_count == 1 && op_obj.operator == "-") {
-                    code_insert(code_pos1, op_obj.operator, debugpos1, i);
-                }
                 if (param_count == 1 && op_obj.operator == "/") {
-                    code_insert(code_pos1, "1", debugpos1, i);
-                    code_insert(code_pos1 + 1, op_obj.operator, debugpos1, i);
+                    code_insert(code_pos2, "1", debugpos1, i);
+                    code_insert(code_pos2 + 1, op_obj.operator, debugpos1, i);
                 }
                 if (param_count == 2 && op_obj.operator == "?") {
                     param_count = 3;
@@ -571,7 +596,12 @@ var SCInfix;
                     debugpos2 = i;
                     throw new Error("引数がありません。");
                 }
-                if (param_count != op_obj.param_num && op_obj.param_num != -1) {
+                if (param_count == 1 && op_obj.param_num == -2) {
+                    debugpos1 = tok_start2;
+                    debugpos2 = i;
+                    throw new Error("引数の数が不正です (引数が2個以上である必要があります)。");
+                }
+                if (param_count != op_obj.param_num && op_obj.param_num >= 0) {
                     debugpos1 = tok_start2;
                     debugpos2 = i;
                     if (op_obj.operator == "?") {
