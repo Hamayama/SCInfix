@@ -5,7 +5,7 @@
 <title>SCInfix</title>
 <!--
     scinfix.html
-    2015-11-2 v1.10
+    2015-11-2 v1.11
 -->
 <style type="text/css">
 <!--
@@ -276,6 +276,7 @@ var SCInfix;
             var output_st;       // 出力文字列
             var code_length;     // コード数
             var arr_st = [];     // 文字列の配列
+            var arr_st_length;   // 文字列の配列長
             var add_space_flag1; // 空白追加用1
             var add_space_flag2; // 空白追加用2
 
@@ -290,7 +291,15 @@ var SCInfix;
                     add_space_flag1 = false;
                     add_space_flag2 = true;
                 } else if (operator_table2.hasOwnProperty(wd) || wd == ":") {
-                    add_space_flag1 = true;
+                    arr_st_length = arr_st.length;
+                    if (arr_st_length == 0 ||
+                        arr_st[arr_st_length - 1] == " " ||
+                        arr_st[arr_st_length - 1] == "(" ||
+                        arr_st[arr_st_length - 1] == "\n") {
+                        add_space_flag1 = false;
+                    } else {
+                        add_space_flag1 = true;
+                    }
                     add_space_flag2 = true;
                 } else {
                     add_space_flag1 = false;
