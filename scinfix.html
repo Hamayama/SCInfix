@@ -5,7 +5,7 @@
 <title>SCInfix</title>
 <!--
     scinfix.html
-    2015-11-3 v1.12
+    2015-11-4 v1.13
 -->
 <style type="text/css">
 <!--
@@ -150,7 +150,7 @@ var SCInfix;
 (function (SCInfix) {
     // ***** 定数 *****
     var operator_data = [ // 演算子データ
-        // 手続き名、演算子、引数の数、優先順位
+        // 手続き名, 演算子, 引数の数, 優先順位
         ["inc!",     "++",     1,     100], // 引数2個には未対応
         ["dec!",     "--",     1,     100], // 引数2個には未対応
         ["expt",     "**",     2,      90],
@@ -225,6 +225,7 @@ var SCInfix;
                               //   code[i].opt       最適化用情報(未使用)
     var debugpos1;            // デバッグ位置1
     var debugpos2;            // デバッグ位置2
+    var line_feed_num;        // 未出力の改行数
 
     // ***** 公開I/F *****
 
@@ -338,21 +339,22 @@ var SCInfix;
         var i;
         var msg;
         var tok_end;
-        var line_feed_num = 0;
+        var last_lf_num;
 
         // ***** コンパイル *****
         code = [];
         debugpos1 = 0;
         debugpos2 = 0;
+        line_feed_num = 0;
         try {
             // ***** プログラムのコンパイル *****
             tok_end = token.length - 4; // 終端4個分マイナス
-            line_feed_num = 0;
+            last_lf_num = 0;
             while (tok_end > 0) {
                 // ***** 末尾の改行を削除 *****
                 // (改行のスキップにより、1回多く読み込んでしまうことを回避するため)
                 if (token[tok_end - 1].kind == 0) {
-                    line_feed_num++;
+                    last_lf_num++;
                     tok_end--;
                     continue;
                 }
@@ -361,7 +363,7 @@ var SCInfix;
             c_prog(0, tok_end);
             if (line_feed) {
                 // ***** 末尾の改行を戻す *****
-                for (i = 0; i < line_feed_num; i++) {
+                for (i = 0; i < last_lf_num; i++) {
                     code_push("\n", debugpos1, tok_end);
                 }
             }
@@ -378,7 +380,7 @@ var SCInfix;
             msg = "エラー場所: " + token[debugpos1].line_no + "行: ";
             if (debugpos2 <= debugpos1) { debugpos2 = debugpos1 + 1; }
             for (i = debugpos1; i < debugpos2; i++) {
-                if (i >= 0 && i < token.length - 4) { // 終端4個分マイナス
+                if (i >= 0 && i < tok_end) {
                     msg = msg + token[i].word + " ";
                 }
             }
@@ -407,6 +409,7 @@ var SCInfix;
             // ***** S式のコンパイル *****
             i = c_sexpr(i, tok_end, false, 0);
             code_push(";", debugpos1, i);
+            output_line_feed(i);
             if (!line_feed) {
                 code_push("\n", debugpos1, i);
             }
@@ -417,7 +420,6 @@ var SCInfix;
         var i;
         var tok;
         var tok_start2;
-        var line_feed_num = 0;
         var op_obj = {};
         var op_obj2 = {};
         var param_count;
@@ -427,40 +429,12 @@ var SCInfix;
         var plus_minus_flag;
 
         // ***** トークン取り出し *****
-        // (改行をスキップする)
-        function get_token() {
-            var tok = null;
-            while (i < tok_end) {
-                tok = token[i];
-                // ***** 改行のとき *****
-                if (tok.kind == 0) {
-                    i++;
-                    line_feed_num++;
-                    continue;
-                }
-                break;
-            }
-            return (tok || token[i]);
-        }
-        // ***** 改行の出力 *****
-        // (演算子の直前で改行しないように、呼び出すタイミングに注意する)
-        function output_line_feed() {
-            var i2;
-            if (line_feed) {
-                for (i2 = 0; i2 < line_feed_num; i2++) {
-                    code_push("\n", debugpos1, i);
-                }
-            }
-            line_feed_num = 0;
-        }
-
-        // ***** トークン取り出し *****
         i = tok_start;
+        i = skip_line_feed(i, tok_end);
+        output_line_feed(i);
         debugpos1 = i;
-        tok = get_token();
-        output_line_feed();
         tok_start2 = i;
-        debugpos1 = i;
+        tok = token[i];
 
         // ***** 終端のとき *****
         if (tok.word == ";end") {
@@ -499,7 +473,8 @@ var SCInfix;
             param_count = 0;
             while (i < tok_end) {
                 // ***** トークン取り出し *****
-                tok = get_token();
+                i = skip_line_feed(i, tok_end);
+                tok = token[i];
                 // ***** 閉じ括弧のとき *****
                 if (tok.kind == 2) { i++; break; }
                 // ***** S式のコンパイル *****
@@ -507,10 +482,10 @@ var SCInfix;
                 if (param_count > 1) {
                     code_push(",", debugpos1, i);
                 }
-                output_line_feed();
+                output_line_feed(i);
                 i = c_sexpr(i, tok_end, quote_flag, 0);
             }
-            output_line_feed();
+            output_line_feed(i);
             // ***** 閉じ括弧がなかったとき *****
             if (tok.kind != 2) {
                 debugpos1 = tok_start2;
@@ -527,17 +502,18 @@ var SCInfix;
         if (tok.kind == 1) {
             i++;
             // ***** トークン取り出し *****
-            tok = get_token();
+            i = skip_line_feed(i, tok_end);
+            tok = token[i];
             // ***** 閉じ括弧のとき *****
             // (空の配列 [ ] に変換する)
             if (tok.kind == 2) {
                 i++;
                 code_push("[", debugpos1, i);
-                output_line_feed();
+                output_line_feed(i);
                 code_push("]", debugpos1, i);
                 return i;
             }
-            output_line_feed();
+            output_line_feed(i);
 
             // ***** 演算子に対応する手続きのとき *****
             // (式 x=a+b 等 に変換する)
@@ -559,7 +535,8 @@ var SCInfix;
                 plus_minus_flag = false;
                 while (i < tok_end) {
                     // ***** トークン取り出し *****
-                    tok = get_token();
+                    i = skip_line_feed(i, tok_end);
+                    tok = token[i];
                     // ***** 閉じ括弧のとき *****
                     if (tok.kind == 2) { i++; break; }
                     // ***** S式のコンパイル *****
@@ -592,10 +569,10 @@ var SCInfix;
                             code_push(op_obj.operator, debugpos1, i);
                         }
                     }
-                    output_line_feed();
+                    output_line_feed(i);
                     i = c_sexpr(i, tok_end, quote_flag, op_obj.priority);
                 }
-                output_line_feed();
+                output_line_feed(i);
                 // ***** 引数の数をチェック *****
                 if (param_count == 1 && op_obj.operator == "/") {
                     code_insert(code_pos2, "1", debugpos1, i);
@@ -645,7 +622,8 @@ var SCInfix;
                 param_count = 0;
                 while (i < tok_end) {
                     // ***** トークン取り出し *****
-                    tok = get_token();
+                    i = skip_line_feed(i, tok_end);
+                    tok = token[i];
                     // ***** 閉じ括弧のとき *****
                     if (tok.kind == 2) { i++; break; }
                     // ***** S式のコンパイル *****
@@ -653,13 +631,13 @@ var SCInfix;
                     if (param_count > 1) {
                         code_push("[", debugpos1, i);
                     }
-                    output_line_feed();
+                    output_line_feed(i);
                     i = c_sexpr(i, tok_end, quote_flag, 0);
                     if (param_count > 1) {
                         code_push("]", debugpos1, i);
                     }
                 }
-                output_line_feed();
+                output_line_feed(i);
                 // ***** 引数の数をチェック *****
                 if (param_count <= 1) {
                     debugpos1 = tok_start2;
@@ -682,16 +660,17 @@ var SCInfix;
                 param_count = 0;
                 while (i < tok_end) {
                     // ***** トークン取り出し *****
-                    tok = get_token();
+                    i = skip_line_feed(i, tok_end);
+                    tok = token[i];
                     // ***** 閉じ括弧のとき *****
                     if (tok.kind == 2) { i++; break; }
                     // ***** S式のコンパイル *****
                     param_count++;
                     if (param_count > 1) { i++; break; }
-                    output_line_feed();
+                    output_line_feed(i);
                     i = c_sexpr(i, tok_end, true, 0);
                 }
-                output_line_feed();
+                output_line_feed(i);
                 // ***** 引数の数をチェック *****
                 if (param_count != 1) {
                     debugpos1 = tok_start2;
@@ -716,7 +695,8 @@ var SCInfix;
             param_count = 0;
             while (i < tok_end) {
                 // ***** トークン取り出し *****
-                tok = get_token();
+                i = skip_line_feed(i, tok_end);
+                tok = token[i];
                 // ***** 閉じ括弧のとき *****
                 if (tok.kind == 2) { i++; break; }
                 // ***** S式のコンパイル *****
@@ -724,10 +704,10 @@ var SCInfix;
                 if (param_count > 1) {
                     code_push(",", debugpos1, i);
                 }
-                output_line_feed();
+                output_line_feed(i);
                 i = c_sexpr(i, tok_end, quote_flag, 0);
             }
-            output_line_feed();
+            output_line_feed(i);
             // ***** 閉じ括弧がなかったとき *****
             if (tok.kind != 2) {
                 debugpos1 = tok_start2;
@@ -1089,6 +1069,31 @@ var SCInfix;
         cd.pos2 = pos2;
         cd.opt = 0;
         code.splice(i, 0, cd);
+    }
+
+    // ***** トークンの改行のスキップ *****
+    function skip_line_feed(i, tok_end) {
+        while (i < tok_end) {
+            if (token[i].word == "\n") {
+                i++;
+                line_feed_num++;
+                continue;
+            }
+            break;
+        }
+        return i;
+    }
+
+    // ***** コードの改行の出力 *****
+    // (演算子の直前で改行しないように、呼び出すタイミングに注意する)
+    function output_line_feed(i) {
+        var i2;
+        if (line_feed) {
+            for (i2 = 0; i2 < line_feed_num; i2++) {
+                code_push("\n", debugpos1, i);
+            }
+        }
+        line_feed_num = 0;
     }
 
     // ***** HTML文字列のエスケープ処理 *****
