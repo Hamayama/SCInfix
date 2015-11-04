@@ -5,7 +5,7 @@
 <title>SCInfix</title>
 <!--
     scinfix.html
-    2015-11-4 v1.13
+    2015-11-4 v1.14
 -->
 <style type="text/css">
 <!--
@@ -222,7 +222,6 @@ var SCInfix;
                               //   code[i].word      単語(文字列)
                               //   code[i].pos1      デバッグ位置1
                               //   code[i].pos2      デバッグ位置2
-                              //   code[i].opt       最適化用情報(未使用)
     var debugpos1;            // デバッグ位置1
     var debugpos2;            // デバッグ位置2
     var line_feed_num;        // 未出力の改行数
@@ -1057,7 +1056,6 @@ var SCInfix;
         cd.word = word;
         cd.pos1 = pos1;
         cd.pos2 = pos2;
-        cd.opt = 0;
         code.push(cd);
     }
 
@@ -1067,7 +1065,6 @@ var SCInfix;
         cd.word = word;
         cd.pos1 = pos1;
         cd.pos2 = pos2;
-        cd.opt = 0;
         code.splice(i, 0, cd);
     }
 
