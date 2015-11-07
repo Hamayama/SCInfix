@@ -5,7 +5,7 @@
 <title>SCInfix</title>
 <!--
     scinfix.html
-    2015-11-6 v1.16
+    2015-11-8 v1.17
 -->
 <style type="text/css">
 <!--
@@ -151,8 +151,8 @@ var SCInfix;
     // ***** 定数 *****
     var operator_data = [ // 演算子データ
         // 手続き名, 演算子, 引数の数, 優先順位, 引数なし時の値
-        ["inc!",     "++",     1,     100,     ""], // 引数2個には未対応
-        ["dec!",     "--",     1,     100,     ""], // 引数2個には未対応
+        ["inc!",     "++",     1,     100,     ""], // 引数が2個の場合もある
+        ["dec!",     "--",     1,     100,     ""], // 引数が2個の場合もある
         ["expt",     "**",     2,      90,     ""],
         ["not",      "!",      1,      80,     ""],
         ["lognot",   "~",      1,      80,     ""],
@@ -284,8 +284,10 @@ var SCInfix;
 
             // ***** 出力の生成(サブ) *****
             output_st = "";
-            arr_st = [];
             code_length = code.length;
+            arr_st = [];
+            add_space_flag1 = false;
+            add_space_flag2 = false;
             for (i = 0; i < code_length; i++) {
                 // ***** 単語を追加 *****
                 wd = code[i].word;
@@ -293,9 +295,10 @@ var SCInfix;
                 if (wd == ",") {
                     add_space_flag1 = false;
                     add_space_flag2 = true;
-                } else if (operator_table2.hasOwnProperty(wd) || wd == ":") {
+                } else if (operator_table2.hasOwnProperty(wd) ||
+                           wd == ":" || wd == "+=" || wd == "-=") {
                     if (i == 0 ||
-                        code[i - 1].word == " " ||
+                        add_space_flag2 ||
                         code[i - 1].word == "(" ||
                         code[i - 1].word == "\n") {
                         add_space_flag1 = false;
@@ -412,8 +415,8 @@ var SCInfix;
                 continue;
             }
             // (波括弧処理 : 開き波括弧を外す)
-            if (code[i].word.charAt(0) == "{" && curly_conv) {
-                code[i].word = code[i].word.substring(1);
+            if (code[i].word.substring(0, 2) == "{%" && curly_conv) {
+                code[i].word = code[i].word.substring(2);
                 continue;
             }
         }
@@ -444,7 +447,7 @@ var SCInfix;
         var tok_pos1;
         var code_pos1;
         var code_pos2;
-        var plus_minus_flag;
+        var op_retry_mode;
 
         // ***** トークン取り出し *****
         i = tok_start;
@@ -550,7 +553,7 @@ var SCInfix;
                 }
                 // ***** トークン解析のループ *****
                 param_count = 0;
-                plus_minus_flag = false;
+                op_retry_mode = 0;
                 while (i < tok_end) {
                     // ***** トークン取り出し *****
                     i = skip_line_feed(i, tok_end);
@@ -559,23 +562,38 @@ var SCInfix;
                     if (tok.kind == 2) { i++; break; }
                     // ***** S式のコンパイル *****
                     param_count++;
-                    // (演算子が + か - で、単項でなかった場合は、優先順位を変えてやり直す)
-                    if (param_count == 2 && !plus_minus_flag &&
+                    // (特定の演算子で、単項でなかった場合は、優先順位を変えてやり直す)
+                    if (param_count == 2 && op_retry_mode == 0 &&
                         (op_obj.operator == "+" || op_obj.operator == "-")) {
-                        plus_minus_flag = true;
-                        i = tok_pos1;
-                        param_count = 0;
+                        op_retry_mode = 1;
                         op_obj2 = {};
                         op_obj2.operator = op_obj.operator;
                         op_obj2.param_num = -2;
                         op_obj2.priority = 30;
+                        op_obj2.unitvalue = "";
                         op_obj = op_obj2;
+                    }
+                    if (param_count == 2 && op_retry_mode == 0 &&
+                        (op_obj.operator == "++" || op_obj.operator == "--")) {
+                        op_retry_mode = 1;
+                        op_obj2 = {};
+                        op_obj2.operator = op_obj.operator.charAt(0) + "=";
+                        op_obj2.param_num = 2;
+                        op_obj2.priority = 5;
+                        op_obj2.unitvalue = "";
+                        op_obj = op_obj2;
+                    }
+                    if (op_retry_mode == 1) {
+                        op_retry_mode = 2;
+                        i = tok_pos1;
+                        param_count = 0;
                         code.splice(code_pos1, code.length - code_pos1);
                         if (op_obj.priority <= priority) {
                             code_push("(", debugpos1, i);
                         }
                         continue;
                     }
+                    // (引数の数をチェック)
                     if (param_count > op_obj.param_num && op_obj.param_num >= 0) { i++; break; }
                     // (中置演算子の挿入)
                     if (param_count > 1) {
@@ -618,11 +636,13 @@ var SCInfix;
                 if (param_count != op_obj.param_num && op_obj.param_num >= 0) {
                     debugpos1 = tok_start2;
                     debugpos2 = i;
+                    if (op_obj.operator == "+=" || op_obj.operator == "-=") {
+                        throw new Error("引数の数が不正です (引数が1個か2個である必要があります)。");
+                    } 
                     if (op_obj.operator == "?") {
                         throw new Error("引数の数が不正です (引数が2個か3個である必要があります)。");
-                    } else {
-                        throw new Error("引数の数が不正です (引数が" + op_obj.param_num + "個である必要があります)。");
-                    }
+                    } 
+                    throw new Error("引数の数が不正です (引数が" + op_obj.param_num + "個である必要があります)。");
                 }
                 // ***** 閉じ括弧がなかったとき *****
                 if (tok.kind != 2) {
@@ -794,25 +814,26 @@ var SCInfix;
                 token_push(0);
                 continue;
             }
-            // ***** 波括弧「{ ～ }」のとき *****
-            if (ch == "{" && curly_conv) {
+            // ***** 波括弧「{% ～ %}」のとき *****
+            if (ch == "{" && ch2 == "%" && curly_conv) {
                 while (i < src_st_len) {
                     // ***** 1文字取り出す *****
                     ch = src_st.charAt(i++);
                     if (i < src_st_len) { ch2 = src_st.charAt(i); } else { ch2 = ""; }
                     // ***** エスケープのとき *****
-                    if (ch == "\\" && (ch2 == "\\" || ch2 == "{" || ch2 == "}")) { i++; continue; }
+                    if (ch == "\\" && (ch2 == "\\" || ch2 == "{" || ch2 == "}" || ch2 == "%")) { i++; continue; }
                     // ***** デリミタのとき *****
-                    if (ch == "}") { break; }
+                    if (ch == "%" && ch2 == "}") { i++; break; }
                     // ***** 改行のとき *****
                     if (ch == "\r" || ch == "\n") { line_no++; if (ch == "\r" && ch2 == "\n") { i++; } }
                 }
                 // ***** 閉じ波括弧を外して登録 *****
-                if (ch == "}") { j = i - 1; } else { j = i; }
-                if (i_start + 1 < j) { // 波括弧内が0文字なら登録しない
+                if (ch == "%" && ch2 == "}") { j = i - 2; } else { j = i; }
+                if (i_start + 2 < j) { // 波括弧内が0文字なら登録しない
                     temp_st = src_st.substring(i_start, j)
                         .replace(/\\\{/g, "{")   // 「{」のエスケープ
                         .replace(/\\\}/g, "}")   // 「}」のエスケープ
+                        .replace(/\\\%/g, "%")   // 「%」のエスケープ
                         .replace(/\\\\/g, "\\"); // 「\」のエスケープ ← これは最後にしないといけない
                     token_push(100, temp_st);
                 }
@@ -1161,7 +1182,7 @@ var SCInfix;
 <th></th>
 <th align="left"><input type="submit" value="convert"> &nbsp;
 <input type="button" value="clear" onclick="clear_button();"> &nbsp;
-<input type="checkbox" id="curly_conv" checked>: { } conv. &nbsp;
+<input type="checkbox" id="curly_conv" checked>: {% %} conv. &nbsp;
 <input type="checkbox" id="line_feed" checked>: line feed + comment</th>
 <th></th>
 </tr><tr>
