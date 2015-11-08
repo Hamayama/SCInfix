@@ -5,7 +5,7 @@
 <title>SCInfix</title>
 <!--
     scinfix.html
-    2015-11-8 v1.17
+    2015-11-8 v1.18
 -->
 <style type="text/css">
 <!--
@@ -1071,6 +1071,7 @@ var SCInfix;
             token_push(100);
         }
         // ***** 終端4個追加(安全のため) *****
+        line_no_tk = line_no;
         token_push(100, ";end");
         token_push(100, ";end");
         token_push(100, ";end");
