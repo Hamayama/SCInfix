@@ -5,7 +5,7 @@
 <title>SCInfix</title>
 <!--
     scinfix.html
-    2015-11-8 v1.18
+    2015-11-11 v1.19
 -->
 <style type="text/css">
 <!--
@@ -193,7 +193,7 @@ var SCInfix;
         ["if",       "?",      3,      10,     ""], // 引数が2個の場合もある
         ["begin",    ",",      -1,      5,     "0"],
         ["set!",     "=",      2,       5,     ""],
-        ["define",   "=",      -2,      5,     ""]];
+        ["define",   "=",      -1,      5,     ""]];
 
     // ***** 変数 *****
     var src_st;               // ソース(文字列)
@@ -613,6 +613,10 @@ var SCInfix;
                 if (param_count == 1 && op_obj.operator == "/") {
                     code_insert(code_pos2, "1", debugpos1, i);
                     code_insert(code_pos2 + 1, op_obj.operator, debugpos1, i);
+                }
+                if (param_count == 1 && op_obj.operator == "=") {
+                    code_push(op_obj.operator, debugpos1, i);
+                    code_push("0", debugpos1, i);
                 }
                 if (param_count == 2 && op_obj.operator == "?") {
                     param_count = 3;
