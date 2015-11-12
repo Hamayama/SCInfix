@@ -5,7 +5,7 @@
 <title>SCInfix</title>
 <!--
     scinfix.html
-    2015-11-11 v1.19
+    2015-11-12 v1.20
 -->
 <style type="text/css">
 <!--
@@ -274,58 +274,51 @@ var SCInfix;
         // ***** 出力の生成(サブ) *****
         function make_output_sub(escape_func) {
             var i;
-            var wd;              // 単語
-            var wd_2;            // 単語の先頭2文字
-            var output_st;       // 出力文字列
-            var code_length;     // コード数
-            var arr_st = [];     // 文字列の配列
-            var add_space_flag1; // 空白追加用1
-            var add_space_flag2; // 空白追加用2
+            var wd;                  // 単語
+            var wd_2;                // 単語の先頭2文字
+            var output_st;           // 出力文字列
+            var code_length;         // コード数
+            var arr_st = [];         // 文字列の配列
+            var add_space_flag1;     // 空白追加用1
+            var add_space_flag2;     // 空白追加用2
+            var add_space_flag2_old; // 空白追加用2の前回の値
 
             // ***** 出力の生成(サブ) *****
             output_st = "";
             code_length = code.length;
             arr_st = [];
-            add_space_flag1 = false;
-            add_space_flag2 = false;
+            add_space_flag2_old = false;
             for (i = 0; i < code_length; i++) {
                 // ***** 単語を追加 *****
                 wd = code[i].word;
                 wd_2 = wd.substring(0, 2);
+                add_space_flag1 = false;
+                add_space_flag2 = false;
                 if (wd == ",") {
-                    add_space_flag1 = false;
-                    add_space_flag2 = true;
-                } else if (operator_table2.hasOwnProperty(wd) ||
-                           wd == ":" || wd == "+=" || wd == "-=") {
-                    if (i == 0 ||
-                        add_space_flag2 ||
-                        code[i - 1].word == "(" ||
-                        code[i - 1].word == "\n") {
-                        add_space_flag1 = false;
-                    } else {
-                        add_space_flag1 = true;
-                    }
-                    add_space_flag2 = true;
-                } else if (wd_2 == "//" || wd_2 == "/*") {
-                    if (i == 0 ||
-                        code[i - 1].word == "\n") {
-                        add_space_flag1 = false;
-                    } else {
-                        add_space_flag1 = true;
-                    }
-                    if (i == code_length - 1 ||
-                        code[i + 1].word == "\n") {
-                        add_space_flag2 = false;
-                    } else {
+                    if (i != code_length - 1 && code[i + 1].word != "\n") {
                         add_space_flag2 = true;
                     }
-                } else {
-                    add_space_flag1 = false;
-                    add_space_flag2 = false;
+                } else if (operator_table2.hasOwnProperty(wd) ||
+                           wd == ":" || wd == "+=" || wd == "-=") {
+                    if (i != 0 && !add_space_flag2_old &&
+                        code[i - 1].word != "(" && code[i - 1].word != "\n") {
+                        add_space_flag1 = true;
+                    }
+                    if (i != code_length - 1 && code[i + 1].word != "\n") {
+                        add_space_flag2 = true;
+                    }
+                } else if (wd_2 == "//" || wd_2 == "/*") {
+                    if (i != 0 && code[i - 1].word != "\n") {
+                        add_space_flag1 = true;
+                    }
+                    if (i != code_length - 1 && code[i + 1].word != "\n") {
+                        add_space_flag2 = true;
+                    }
                 }
                 if (add_space_flag1) { arr_st.push(" "); }
                 arr_st.push(escape_func ? escape_func(wd) : wd);
                 if (add_space_flag2) { arr_st.push(" "); }
+                add_space_flag2_old = add_space_flag2;
             }
             output_st = arr_st.join("");
             return output_st;
