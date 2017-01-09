@@ -5,7 +5,7 @@
 <title>SCInfix</title>
 <!--
     scinfix.html
-    2015-11-12 v1.21
+    2017-1-9 v1.30
 -->
 <style type="text/css">
 <!--
@@ -97,8 +97,9 @@ function sample_button(sample_no) {
     // ***** 戻り値の初期化 *****
     ret = false;
     // ***** 要素の存在チェック *****
-    if (!document.getElementById("src_text1"))    { Alm("sample_button:0001"); return ret; }
+    if (!document.getElementById("src_text1")) { Alm("sample_button:0001"); return ret; }
     // ***** ソースの設定 *****
+    src_st = "";
     switch (sample_no) {
         case 0:
             src_st = "(+ (* 1 2) (* 3 4) (* 5 6))\n";
@@ -116,9 +117,6 @@ function sample_button(sample_no) {
                 + "(print (~ a 0 1))\n"
                 + "(print (~ a 0 2))\n"
                 + "(print (~ a 2 2))\n";
-            break;
-        default:
-            src_st = "";
             break;
     }
     document.getElementById("src_text1").value = src_st;
@@ -804,7 +802,7 @@ var SCInfix;
             line_no_tk = line_no;
             ch = src_st.charAt(i++);
             if (i < src_st_len) { ch2 = src_st.charAt(i); } else { ch2 = ""; }
-            // ***** 空白またはタブのとき *****
+            // ***** 空白またはTABのとき *****
             if (ch == " " || ch == "\t") { continue; }
             // ***** 改行のとき *****
             if (ch == "\r" || ch == "\n") {
