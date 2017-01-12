@@ -5,7 +5,7 @@
 <title>SCInfix</title>
 <!--
     scinfix.html
-    2017-1-9 v1.30
+    2017-1-12 v1.31
 -->
 <style type="text/css">
 <!--
@@ -797,9 +797,10 @@ var SCInfix;
         line_no = 1;
         src_st_len = src_st.length;
         while (i < src_st_len) {
-            // ***** 1文字取り出す *****
+            // ***** 開始情報更新 *****
             i_start = i;
             line_no_tk = line_no;
+            // ***** 1文字取り出す *****
             ch = src_st.charAt(i++);
             if (i < src_st_len) { ch2 = src_st.charAt(i); } else { ch2 = ""; }
             // ***** 空白またはTABのとき *****
@@ -1045,6 +1046,12 @@ var SCInfix;
                     // ***** 記号文字のとき *****
                     if ("|()\";[]{}\\#".indexOf(ch) >= 0) {
                         i++;
+                        token_push(100);
+                        continue;
+                    }
+                    // ***** 改行のとき *****
+                    // (改行コードの前までを登録(厳密には問題あり))
+                    if (ch == "\r" || ch == "\n") {
                         token_push(100);
                         continue;
                     }
