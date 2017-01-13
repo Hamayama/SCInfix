@@ -5,7 +5,7 @@
 <title>SCInfix</title>
 <!--
     scinfix.html
-    2017-1-12 v1.31
+    2017-1-13 v1.32
 -->
 <style type="text/css">
 <!--
@@ -345,6 +345,8 @@ var SCInfix;
     function compile() {
         var i;
         var msg;
+        var err_line1;
+        var err_line2;
         var tok_end;
         var last_lf_num;
 
@@ -387,12 +389,29 @@ var SCInfix;
         } catch (ex) {
             // ***** 構文エラーのとき *****
             DebugShow("構文エラー: " + ex.message + ": debugpos=" + debugpos1 + "\n");
-            msg = "エラー場所: " + token[debugpos1].line_no + "行: ";
-            if (debugpos2 <= debugpos1) { debugpos2 = debugpos1 + 1; }
+            err_line1 = token[debugpos1].line_no;
+            msg = "エラー場所: " + err_line1 + "行";
+            err_line2 = 0;
+            if (debugpos1 < debugpos2) {
+                if (debugpos2 - 1 < tok_end) {
+                    err_line2 = token[debugpos2 - 1].line_no;
+                }
+            } else {
+                debugpos2 = debugpos1 + 1;
+            }
+            if (err_line1 < err_line2) {
+                msg += " - " + err_line2 + "行\n";
+                msg += "===== 該当範囲: ここから =====\n";
+            } else {
+                msg += ": ";
+            }
             for (i = debugpos1; i < debugpos2; i++) {
                 if (i >= 0 && i < tok_end) {
                     msg = msg + token[i].word + " ";
                 }
+            }
+            if (err_line1 < err_line2) {
+                msg += "\n===== 該当範囲: ここまで =====";
             }
             DebugShow(msg + "\n");
         }
