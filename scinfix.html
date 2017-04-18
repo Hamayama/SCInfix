@@ -5,7 +5,7 @@
 <title>SCInfix</title>
 <!--
     scinfix.html
-    2017-1-13 v1.32
+    2017-4-18 v1.33
 -->
 <style type="text/css">
 <!--
@@ -217,6 +217,7 @@ var SCInfix;
                               //                          =100:その他)
                               //   token[i].word     単語(文字列)
                               //   token[i].line_no  行番号(1オリジン)
+    var end_token_num = 4;    // 終端のトークン数
     var code = [];            // コード(配列)
                               //   code[i].word      単語(文字列)
                               //   code[i].pos1      デバッグ位置1
@@ -357,7 +358,7 @@ var SCInfix;
         line_feed_code = [];
         try {
             // ***** プログラムのコンパイル *****
-            tok_end = token.length - 4; // 終端4個分マイナス
+            tok_end = token.length - end_token_num; // 終端のトークンは対象外
             last_lf_num = 0;
             while (tok_end > 0) {
                 // ***** 末尾の改行(+コメント)を削除 *****
@@ -785,10 +786,10 @@ var SCInfix;
 
     // ***** トークン分割 *****
     function tokenize() {
-        var i, j;
+        var i, i2, j;
         var i_start;      // 単語の開始位置
         var src_st_len;   // ソースの長さ
-        var ch, ch2;      // 文字
+        var ch, ch2, ch3; // 文字
         var line_no;      // 行番号(1オリジン)
         var line_no_tk;   // トークン開始時点の行番号
         var uvector_mode; // ユニフォームベクタ解析モード
@@ -821,7 +822,7 @@ var SCInfix;
             line_no_tk = line_no;
             // ***** 1文字取り出す *****
             ch = src_st.charAt(i++);
-            if (i < src_st_len) { ch2 = src_st.charAt(i); } else { ch2 = ""; }
+            ch2 = src_st.charAt(i);
             // ***** 空白またはTABのとき *****
             if (ch == " " || ch == "\t") { continue; }
             // ***** 改行のとき *****
@@ -836,7 +837,7 @@ var SCInfix;
                 while (i < src_st_len) {
                     // ***** 1文字取り出す *****
                     ch = src_st.charAt(i++);
-                    if (i < src_st_len) { ch2 = src_st.charAt(i); } else { ch2 = ""; }
+                    ch2 = src_st.charAt(i);
                     // ***** エスケープのとき *****
                     if (ch == "\\" && (ch2 == "\\" || ch2 == "{" || ch2 == "}" || ch2 == "%")) { i++; continue; }
                     // ***** デリミタのとき *****
@@ -850,7 +851,7 @@ var SCInfix;
                     temp_st = src_st.substring(i_start, j)
                         .replace(/\\\{/g, "{")   // 「{」のエスケープ
                         .replace(/\\\}/g, "}")   // 「}」のエスケープ
-                        .replace(/\\\%/g, "%")   // 「%」のエスケープ
+                        .replace(/\\%/g,  "%")   // 「%」のエスケープ
                         .replace(/\\\\/g, "\\"); // 「\」のエスケープ ← これは最後にしないといけない
                     token_push(100, temp_st);
                 }
@@ -883,7 +884,7 @@ var SCInfix;
                     // ***** 1文字取り出す *****
                     ch = src_st.charAt(i);
                     // ***** 数値のとき *****
-                    if (isDigit(ch)) {
+                    if (isDigit1(ch)) {
                         i++;
                         uvector_mode = 1;
                         if (i >= i_start + 5) { break; }
@@ -930,7 +931,10 @@ var SCInfix;
             // ***** デバッグマクロのとき *****
             if (ch == "#" && ch2 == "?") {
                 i++;
-                if (i < src_st_len && src_st.charAt(i) == "=") {
+                // ***** 1文字取り出す *****
+                ch3 = src_st.charAt(i);
+                // ***** イコールのとき *****
+                if (ch3 == "=") {
                     i++;
                     token_push(3);
                     continue;
@@ -963,7 +967,7 @@ var SCInfix;
                 while (i < src_st_len) {
                     // ***** 1文字取り出す *****
                     ch = src_st.charAt(i++);
-                    if (i < src_st_len) { ch2 = src_st.charAt(i); } else { ch2 = ""; }
+                    ch2 = src_st.charAt(i);
                     // ***** 複数行コメント開始のとき *****
                     if (ch == "#" && ch2 == "|") { i++; comment_nest++; }
                     // ***** 複数行コメント終了のとき *****
@@ -992,7 +996,7 @@ var SCInfix;
                 while (i < src_st_len) {
                     // ***** 1文字取り出す *****
                     ch = src_st.charAt(i++);
-                    if (i < src_st_len) { ch2 = src_st.charAt(i); } else { ch2 = ""; }
+                    ch2 = src_st.charAt(i);
                     // ***** エスケープのとき *****
                     if (ch == "\\" && (ch2 == "\\" || ch2 == delim_ch)) { i++; continue; }
                     // ***** デリミタのとき *****
@@ -1008,7 +1012,10 @@ var SCInfix;
                 i++;
                 string_start = true;
                 if (ch2 == "*" || ch2 == "`") {
-                    if (i < src_st_len && src_st.charAt(i) == "\"") {
+                    // ***** 1文字取り出す *****
+                    ch3 = src_st.charAt(i);
+                    // ***** デリミタのとき *****
+                    if (ch3 == "\"") {
                         i++;
                     } else {
                         string_start = false;
@@ -1018,7 +1025,7 @@ var SCInfix;
                     while (i < src_st_len) {
                         // ***** 1文字取り出す *****
                         ch = src_st.charAt(i++);
-                        if (i < src_st_len) { ch2 = src_st.charAt(i); } else { ch2 = ""; }
+                        ch2 = src_st.charAt(i);
                         // ***** エスケープのとき *****
                         if (ch == "\\" && (ch2 == "\\" || ch2 == "\"")) { i++; continue; }
                         // ***** デリミタのとき *****
@@ -1041,7 +1048,7 @@ var SCInfix;
                 while (i < src_st_len) {
                     // ***** 1文字取り出す *****
                     ch = src_st.charAt(i++);
-                    if (i < src_st_len) { ch2 = src_st.charAt(i); } else { ch2 = ""; }
+                    ch2 = src_st.charAt(i);
                     // ***** エスケープのとき *****
                     if (ch == "\\" && (ch2 == "\\" || ch2 == delim_ch)) { i++; continue; }
                     // ***** デリミタのとき *****
@@ -1093,12 +1100,11 @@ var SCInfix;
             }
             token_push(100);
         }
-        // ***** 終端4個追加(安全のため) *****
+        // ***** 終端のトークンを追加(安全のため) *****
         line_no_tk = line_no;
-        token_push(100, ";end");
-        token_push(100, ";end");
-        token_push(100, ";end");
-        token_push(100, ";end");
+        for (i2 = 0; i2 < end_token_num; i2++) {
+            token_push(100, ";end");
+        }
     }
 
     // ***** 演算子情報の生成 *****
@@ -1106,7 +1112,6 @@ var SCInfix;
         var i;
         var op_obj = {};
 
-        // ***** 演算子情報の生成 *****
         operator_table1 = {};
         operator_table2 = {};
         for (i = 0; i < operator_data.length; i++) {
@@ -1175,9 +1180,8 @@ var SCInfix;
             .replace(/'/g,   "&#39;");
     }
 
-    // ***** 数値チェック *****
-    function isDigit(ch) {
-        // if (ch.match(/^[0-9]+$/)) { return true; }
+    // ***** 数値チェック(1文字のみ) *****
+    function isDigit1(ch) {
         var c = ch.charCodeAt(0);
         if (c >= 0x30 && c <= 0x39) { return true; }
         return false;
