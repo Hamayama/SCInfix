@@ -5,7 +5,7 @@
 <title>SCInfix</title>
 <!--
     scinfix.html
-    2017-4-18 v1.33
+    2017-4-20 v1.34
 -->
 <style type="text/css">
 <!--
@@ -843,7 +843,10 @@ var SCInfix;
                     // ***** デリミタのとき *****
                     if (ch == "%" && ch2 == "}") { i++; break; }
                     // ***** 改行のとき *****
-                    if (ch == "\r" || ch == "\n") { line_no++; if (ch == "\r" && ch2 == "\n") { i++; } }
+                    if (ch == "\r" || ch == "\n") {
+                        line_no++;
+                        if (ch == "\r" && ch2 == "\n") { i++; }
+                    }
                 }
                 // ***** 閉じ波括弧を外して登録 *****
                 if (ch == "%" && ch2 == "}") { j = i - 2; } else { j = i; }
@@ -976,7 +979,10 @@ var SCInfix;
                         if (comment_nest <= 0) { break; }
                     }
                     // ***** 改行のとき *****
-                    if (ch == "\r" || ch == "\n") { line_no++; if (ch == "\r" && ch2 == "\n") { i++; } }
+                    if (ch == "\r" || ch == "\n") {
+                        line_no++;
+                        if (ch == "\r" && ch2 == "\n") { i++; }
+                    }
                 }
                 // token_push(52);
                 temp_st = "/* " + src_st.substring(i_start, i) + " */";
@@ -1002,7 +1008,10 @@ var SCInfix;
                     // ***** デリミタのとき *****
                     if (ch == delim_ch) { break; }
                     // ***** 改行のとき *****
-                    if (ch == "\r" || ch == "\n") { line_no++; if (ch == "\r" && ch2 == "\n") { i++; } }
+                    if (ch == "\r" || ch == "\n") {
+                        line_no++;
+                        if (ch == "\r" && ch2 == "\n") { i++; }
+                    }
                 }
                 token_push(100);
                 continue;
@@ -1031,7 +1040,10 @@ var SCInfix;
                         // ***** デリミタのとき *****
                         if (ch == "\"") { break; }
                         // ***** 改行のとき *****
-                        if (ch == "\r" || ch == "\n") { line_no++; if (ch == "\r" && ch2 == "\n") { i++; } }
+                        if (ch == "\r" || ch == "\n") {
+                            line_no++;
+                            if (ch == "\r" && ch2 == "\n") { i++; }
+                        }
                     }
                     token_push(100);
                     continue;
@@ -1058,7 +1070,10 @@ var SCInfix;
                         break;
                     }
                     // ***** 改行のとき *****
-                    if (ch == "\r" || ch == "\n") { line_no++; if (ch == "\r" && ch2 == "\n") { i++; } }
+                    if (ch == "\r" || ch == "\n") {
+                        line_no++;
+                        if (ch == "\r" && ch2 == "\n") { i++; }
+                    }
                 }
                 token_push(100);
                 continue;
