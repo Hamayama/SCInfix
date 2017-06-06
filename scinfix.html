@@ -5,7 +5,7 @@
 <title>SCInfix</title>
 <!--
     scinfix.html
-    2017-4-20 v1.34
+    2017-6-6 v1.35
 -->
 <style type="text/css">
 <!--
@@ -247,7 +247,7 @@ var SCInfix;
         // ***** 改行(+コメント)反映フラグの取得 *****
         line_feed = line_feed1;
         // ***** 演算子情報の生成 *****
-        make_optable();
+        make_operator_table();
         // ***** トークン分割 *****
         tokenize();
         // ***** コンパイル *****
@@ -823,7 +823,7 @@ var SCInfix;
             // ***** 1文字取り出す *****
             ch = src_st.charAt(i++);
             ch2 = src_st.charAt(i);
-            // ***** 空白またはTABのとき *****
+            // ***** 空白またはタブのとき *****
             if (ch == " " || ch == "\t") { continue; }
             // ***** 改行のとき *****
             if (ch == "\r" || ch == "\n") {
@@ -1123,7 +1123,7 @@ var SCInfix;
     }
 
     // ***** 演算子情報の生成 *****
-    function make_optable() {
+    function make_operator_table() {
         var i;
         var op_obj = {};
 
@@ -1198,8 +1198,7 @@ var SCInfix;
     // ***** 数値チェック(1文字のみ) *****
     function isDigit1(ch) {
         var c = ch.charCodeAt(0);
-        if (c >= 0x30 && c <= 0x39) { return true; }
-        return false;
+        return (c >= 0x30 && c <= 0x39);
     }
 
 
