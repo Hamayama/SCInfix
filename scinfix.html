@@ -5,7 +5,7 @@
 <title>SCInfix</title>
 <!--
     scinfix.html
-    2017-7-17 v1.36
+    2018-6-26 v1.37
 -->
 <style type="text/css">
 <!--
@@ -13,6 +13,7 @@
     background-color: #fffca8; /* 背景色 */
     color: #000000;            /* 文字色 */
 }
+td { font-weight: bold; }
 -->
 </style>
 <script type="text/javascript">
@@ -92,17 +93,17 @@ function sample_button(sample_no) {
             break;
         case 1:
             src_st = ";; Function sample\n"
-                + "(define pi 3.141592653589793)\n"
-                + "(define x (/. pi 6))\n"
-                + "(define y (+ (* (sin x) (sin x)) (* (cos x) (cos x))))\n";
+                   + "(define pi 3.141592653589793)\n"
+                   + "(define x (/. pi 6))\n"
+                   + "(define y (+ (* (sin x) (sin x)) (* (cos x) (cos x))))\n";
             break;
         case 2:
             src_st = ";; Array sample\n"
-                + "(define a '((1 2 3) (4 5 6) (7 8 9)))\n"
-                + "(print (~ a 0 0))\n"
-                + "(print (~ a 0 1))\n"
-                + "(print (~ a 0 2))\n"
-                + "(print (~ a 2 2))\n";
+                   + "(define a '((1 2 3) (4 5 6) (7 8 9)))\n"
+                   + "(print (~ a 0 0))\n"
+                   + "(print (~ a 0 1))\n"
+                   + "(print (~ a 0 2))\n"
+                   + "(print (~ a 2 2))\n";
             break;
     }
     document.getElementById("src_text1").value = src_st;
@@ -289,7 +290,7 @@ var SCInfix;
                     if (i != code_len - 1 && code[i + 1].word != "\n") {
                         add_space_flag2 = true;
                     }
-                } else if (wd_2 == "//" || wd_2 == "/*") {
+                } else if (wd_2 == "//" || wd_2 == "/*") { // GitHubの色表示対策 */
                     if (i != 0 && code[i - 1].word != "\n") {
                         add_space_flag1 = true;
                     }
@@ -1196,29 +1197,29 @@ var SCInfix;
 <body class="main_container">
 
 <form action="#" onsubmit="convert_button(); return false;">
-<table width="95%"><tr>
-<th align="center" colspan="3">SCInfix</th>
+<table style="width: 95%;"><tr>
+<td colspan="3" style="text-align: center;">SCInfix</td>
 </tr><tr>
-<th align="left" valign="top">src:</th>
-<th align="left" width="95%"><textarea id="src_text1" cols="40" rows="10" style="width: 100%;"></textarea></th>
-<th></th>
+<td style="vertical-align: top;">src:</td>
+<td style="width: 95%;"><textarea id="src_text1" cols="40" rows="10" style="width: 100%;"></textarea></td>
+<td></td>
 </tr><tr>
-<th></th>
-<th align="left"><input type="submit" value="convert"> &nbsp;
+<td></td>
+<td><input type="submit" value="convert"> &nbsp;
 <input type="button" value="clear" onclick="clear_button();"> &nbsp;
-<input type="checkbox" id="curly_conv" checked>: {% %} conv. &nbsp;
-<input type="checkbox" id="line_feed" checked>: line feed + comment</th>
-<th></th>
+<input type="checkbox" id="curly_conv" value="1" checked>: {% %} conv. &nbsp;
+<input type="checkbox" id="line_feed" value="1" checked>: line feed + comment</td>
+<td></td>
 </tr><tr>
-<th align="left" valign="top">out:</th>
-<th align="left" width="95%"><textarea id="out_text1" cols="40" rows="10" style="width: 100%;"></textarea></th>
-<th></th>
+<td style="vertical-align: top;">out:</td>
+<td style="width: 95%;"><textarea id="out_text1" cols="40" rows="10" style="width: 100%;"></textarea></td>
+<td></td>
 </tr><tr>
-<th></th>
-<th align="left"><input type="button" value="sample1" onclick="sample_button(0);">
+<td></td>
+<td><input type="button" value="sample1" onclick="sample_button(0);">
 <input type="button" value="sample2" onclick="sample_button(1);">
-<input type="button" value="sample3" onclick="sample_button(2);"></th>
-<th></th>
+<input type="button" value="sample3" onclick="sample_button(2);"></td>
+<td></td>
 </tr></table>
 <pre><span id="debug_show1"></span></pre>
 <pre><span id="result_show1"></span></pre>
